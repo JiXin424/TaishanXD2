@@ -1,0 +1,7 @@
+# Local environment
+.env.local
+
+# Container data volumes
+.data/
+FULL_FEATURE_SPEC.md
+plan.md

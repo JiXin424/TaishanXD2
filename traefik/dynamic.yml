@@ -1,0 +1,41 @@
+# Traefik 动态路由配置
+# 宿主机服务通过 host.docker.internal 访问（macOS / Windows WSL2 通用）
+
+http:
+  routers:
+    # 核心网关 —— Go / Spring Boot
+    api-router:
+      rule: "Host(`api.taishan.local`)"
+      entryPoints:
+        - web
+      service: api-service
+
+    # AI 微服务 —— Python FastAPI
+    llm-router:
+      rule: "Host(`llm.taishan.local`)"
+      entryPoints:
+        - web
+      service: llm-service
+
+    # Next.js 前端
+    web-router:
+      rule: "Host(`app.taishan.local`)"
+      entryPoints:
+        - web
+      service: web-service
+
+  services:
+    api-service:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:4007"
+
+    llm-service:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:8000"
+
+    web-service:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:3000"

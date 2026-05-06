@@ -1,0 +1,170 @@
+basePath: /
+definitions:
+  model.HealthResponse:
+    properties:
+      postgres:
+        type: string
+      redis:
+        type: string
+    type: object
+  model.LoginRequest:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  model.SystemInfo:
+    properties:
+      environment:
+        type: string
+      goVersion:
+        type: string
+      startedAt:
+        type: string
+      version:
+        type: string
+    type: object
+  model.User:
+    properties:
+      companyId:
+        type: integer
+      companyName:
+        type: string
+      dataScope:
+        type: integer
+      displayName:
+        type: string
+      id:
+        type: integer
+      realName:
+        type: string
+      username:
+        type: string
+    type: object
+host: localhost:4007
+info:
+  contact: {}
+  description: 销售赋能中心后端 API 文档
+  title: TaishanXD V2 API
+  version: 2.0.0
+paths:
+  /api/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: 通过用户名密码登录，成功后设置 HttpOnly Cookie 并将 Session 写入 Redis
+      parameters:
+      - description: 登录凭据
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/model.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok=true, user=AuthUser
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 用户登录
+      tags:
+      - 认证
+  /api/auth/logout:
+    post:
+      description: 清除 Session Cookie 和 Redis 中的 Session 记录
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok=true
+          schema:
+            additionalProperties:
+              type: boolean
+            type: object
+      summary: 退出登录
+      tags:
+      - 认证
+  /api/auth/session:
+    get:
+      description: 通过 Cookie 或 Bearer Token 获取当前登录用户信息（需认证）
+      parameters:
+      - description: taishan_session=xxx
+        in: header
+        name: Cookie
+        type: string
+      - description: Bearer xxx
+        in: header
+        name: Authorization
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.User'
+        "401":
+          description: error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 获取当前会话
+      tags:
+      - 认证
+  /api/health:
+    get:
+      description: 检查 PostgreSQL 和 Redis 连接状态
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.HealthResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/model.HealthResponse'
+      summary: 健康检查
+      tags:
+      - 系统
+  /api/system/info:
+    get:
+      description: 获取服务版本、Go 版本、启动时间等信息
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.SystemInfo'
+      summary: 系统信息
+      tags:
+      - 系统
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
