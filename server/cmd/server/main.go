@@ -36,10 +36,18 @@ func main() {
 	}
 	fmt.Println("Redis connected")
 
+	if err := repository.InitMongo(cfg); err != nil {
+		log.Fatalf("Failed to connect MongoDB: %v", err)
+	}
+	defer repository.CloseMongo()
+	fmt.Println("MongoDB connected")
+
 	gin.SetMode(gin.DebugMode)
 	r := gin.Default()
 
 	handler.RegisterRoutes(r, cfg.SessionKey)
+	handler.RegisterWecomRoutes(r)
+	handler.RegisterMongoRoutes(r)
 
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swagFiles.Handler))
 

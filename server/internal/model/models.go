@@ -18,6 +18,7 @@ type LoginRequest struct {
 type HealthResponse struct {
 	Postgres string `json:"postgres"`
 	Redis    string `json:"redis"`
+	Mongo    string `json:"mongo"`
 }
 
 type SystemInfo struct {
@@ -25,4 +26,33 @@ type SystemInfo struct {
 	GoVersion   string `json:"goVersion"`
 	StartedAt   string `json:"startedAt"`
 	Environment string `json:"environment"`
+}
+
+type Company struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+	Code string `json:"code"`
+}
+
+type CompanyResponse struct {
+	ID       int      `json:"id"`
+	Name     string   `json:"name"`
+	Code     string   `json:"code"`
+	Channels []string `json:"channels"`
+}
+
+type WecomUser struct {
+	ID             int    `json:"id"`
+	UserID         string `json:"userId"`
+	Name           string `json:"name"`
+	Mobile         string `json:"mobile"`
+	JobTitle       string `json:"jobTitle"`
+	DepartmentPath string `json:"departmentPath"`
+	CompanyID      int    `json:"companyId"`
+}
+
+type WecomStats struct {
+	TotalUsers    int `json:"totalUsers"`
+	TotalMessages int `json:"totalMessages"`
+	TotalChats    int `json:"totalChats"`
 }

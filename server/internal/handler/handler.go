@@ -35,7 +35,7 @@ func RegisterRoutes(r *gin.Engine, sessionKey string) {
 
 // healthCheck godoc
 // @Summary      健康检查
-// @Description  检查 PostgreSQL 和 Redis 连接状态
+// @Description  检查 PostgreSQL、Redis 和 MongoDB 连接状态
 // @Tags         系统
 // @Produce      json
 // @Success      200  {object}  model.HealthResponse
@@ -52,14 +52,20 @@ func healthCheck(c *gin.Context) {
 		redisStatus = fmt.Sprintf("error: %v", err)
 	}
 
+	mongoStatus := "ok"
+	if err := repository.CheckMongo(); err != nil {
+		mongoStatus = fmt.Sprintf("error: %v", err)
+	}
+
 	code := http.StatusOK
-	if pgStatus != "ok" || redisStatus != "ok" {
+	if pgStatus != "ok" || redisStatus != "ok" || mongoStatus != "ok" {
 		code = http.StatusServiceUnavailable
 	}
 
 	c.JSON(code, model.HealthResponse{
 		Postgres: pgStatus,
 		Redis:    redisStatus,
+		Mongo:    mongoStatus,
 	})
 }
 
@@ -191,4 +197,12 @@ func generateToken() string {
 	b := make([]byte, 32)
 	rand.Read(b)
 	return hex.EncodeToString(b)
+}
+
+func RegisterMongoRoutes(r *gin.Engine) {
+	org := r.Group("/api/org")
+	RegisterMongoCompanyRoutes(org)
+	RegisterMongoOrgRoutes(org)
+	RegisterMongoUserRoutes(org)
+	RegisterMongoPositionRoutes(org)
 }
