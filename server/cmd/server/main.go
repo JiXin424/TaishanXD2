@@ -42,6 +42,12 @@ func main() {
 	defer repository.CloseMongo()
 	fmt.Println("MongoDB connected")
 
+	if err := repository.CreateIndexes(); err != nil {
+		log.Printf("Warning: MongoDB index creation failed: %v", err)
+	} else {
+		fmt.Println("MongoDB indexes created")
+	}
+
 	gin.SetMode(gin.DebugMode)
 	r := gin.Default()
 
