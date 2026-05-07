@@ -44,6 +44,28 @@ services:
     networks:
       - taishan-network
 
+  # ── MongoDB ────────────────────────────────────────────────────
+  mongo:
+    image: mongo:7
+    container_name: taishan-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-taishan}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-taishan_dev}
+      MONGO_INITDB_DATABASE: ${MONGO_DB:-taishan}
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+    volumes:
+      - ./.data/mongo:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    networks:
+      - taishan-network
+
   # ── Go Backend ────────────────────────────────────────────────
   server:
     build:
@@ -61,6 +83,11 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       REDIS_PASSWORD: ${REDIS_PASSWORD:-taishan_dev}
+      MONGO_HOST: mongo
+      MONGO_PORT: "27017"
+      MONGO_USER: ${MONGO_USER:-taishan}
+      MONGO_PASSWORD: ${MONGO_PASSWORD:-taishan_dev}
+      MONGO_DB: ${MONGO_DB:-taishan}
       SESSION_SECRET: ${SESSION_SECRET:-change-me-in-production}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
     ports:
@@ -69,6 +96,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      mongo:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:4007/api/health"]
@@ -84,6 +113,8 @@ services:
     build:
       context: ./web
       dockerfile: Dockerfile
+      args:
+        BACKEND_URL: http://server:4007
     container_name: taishan-web
     restart: unless-stopped
     environment:
