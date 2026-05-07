@@ -4,7 +4,7 @@
 
 全栈数据分析看板，核心功能：展示和分析 Dify 工作流使用数据、钉钉集成、Langfuse 评分、LLM 智能分析报告生成、多租户 RBAC 数据权限隔离。
 
-当前状态：基础认证 + Dashboard 框架已搭建完成，大部分功能待开发。
+当前状态：基础认证 + Dashboard 框架 + 多公司/渠道切换（超管视角）已搭建完成。企业微信对接真实数据库，钉钉/飞书使用前端 mock。
 
 ## 技术栈
 
@@ -12,6 +12,7 @@
 |------|------|
 | 前端 | Next.js 16 (App Router) + React 19 + Ant Design 6 + Tailwind CSS 4 + TypeScript 5 |
 | 后端 | Go 1.26 + Gin + PostgreSQL 16 (lib/pq) + Redis 7 (go-redis/v9) |
+| 数据库 | MongoDB 7 (mongo-driver/v2) — 用户、组织架构、权限数据 |
 | AI 服务 | Python FastAPI + DashScope Qwen（计划中，未实现） |
 | 网关 | Traefik v3.3 |
 | 部署 | Docker Compose 多容器编排 |
@@ -26,31 +27,48 @@ TaishanXD2/
 │   │   └── bootstrap/main.go        # 引导服务（创建初始管理员等）
 │   ├── internal/
 │   │   ├── handler/handler.go       # HTTP 路由注册 + 业务处理（登录/登出/健康检查/系统信息）
+│   │   ├── handler/wecom.go         # 企业微信 API（公司列表、用户列表、统计数据）
+│   │   ├── handler/mongo_companies.go    # MongoDB 公司 CRUD
+│   │   ├── handler/mongo_organizations.go # MongoDB 组织架构 CRUD + 树
+│   │   ├── handler/mongo_users.go        # MongoDB 用户 CRUD + 管辖范围查询
+│   │   ├── handler/mongo_positions.go    # MongoDB 职位 CRUD
 │   │   ├── middleware/
 │   │   │   ├── auth.go              # 认证中间件（Cookie + Bearer Token → Redis Session）
 │   │   │   └── cors.go              # CORS 跨域配置
 │   │   ├── repository/
 │   │   │   ├── db.go                # PostgreSQL 连接池初始化 + 健康检查
+│   │   │   ├── mongo.go             # MongoDB 连接池初始化 + 集合访问
 │   │   │   └── redis.go             # Redis 客户端初始化 + Session CRUD
 │   │   ├── config/config.go         # 环境变量配置加载（DB/Redis/端口/密钥）
-│   │   └── model/models.go          # 数据模型（User, LoginRequest, HealthResponse, SystemInfo）
+│   │   └── model/models.go          # 数据模型（User, LoginRequest, HealthResponse, SystemInfo, Company, WecomUser, WecomStats）
+│   │   └── model/mongo.go           # MongoDB 文档模型（CompanyDoc, OrgDoc, UserDoc, PositionDoc）
 │   ├── docs/                        # Swagger 自动生成文档
 │   └── Dockerfile
 │
 ├── web/                             # Next.js 前端
 │   ├── src/
 │   │   ├── app/
-│   │   │   ├── layout.tsx           # 根布局（全局 metadata）
-│   │   │   ├── page.tsx             # 首页（重定向到 /login）
-│   │   │   ├── login/page.tsx       # 登录页
-│   │   │   └── dashboard/page.tsx   # 主面板（系统概览、健康状态、用户信息）
-│   │   └── lib/api.ts               # HTTP 客户端封装 + TypeScript 类型定义
+│   │   │   ├── layout.tsx                   # 根布局（全局 metadata）
+│   │   │   ├── page.tsx                     # 首页（重定向到 /login）
+│   │   │   ├── login/page.tsx               # 登录页（暂无校验，直接跳转）
+│   │   │   └── dashboard/
+│   │   │       ├── layout.tsx               # Dashboard 共享布局（侧边栏 + Header）
+│   │   │       ├── page.tsx                 # 重定向到 /dashboard/overview
+│   │   │       ├── overview/page.tsx        # 系统概览（健康检查、系统信息）
+│   │   │       ├── users/page.tsx           # 用户明细（表格 + 搜索）
+│   │   │       └── analytics/page.tsx       # 使用分析（统计卡片 + 图表占位）
+│   │   ├── lib/api.ts               # HTTP 客户端封装 + TypeScript 类型定义
+│   │   ├── lib/AppContext.tsx        # 全局状态 Context（当前公司 ID + 渠道选择）
+│   │   └── lib/mockData.ts          # 钉钉/飞书 mock 数据（用户列表 + 统计数据）
 │   ├── public/                      # 静态资源
 │   └── Dockerfile
 │
 ├── docker/
 │   └── postgres/
-│       └── init/001_schema.sql      # 数据库 Schema（companies/departments/users/roles/user_roles/company_apps）+ 种子数据
+│       └── init/001_schema.sql      # 数据库 Schema（wecom/dingtalk/feishu 渠道表 + sales 表）
+│       └── init/002_companies.sql   # companies 表 + 种子数据（九峰、福多多）
+│       └── init/003_wecom_company.sql  # wecom 表加 company_id 字段 + 索引
+│       └── init/004_wecom_mock_data.sql  # 企业微信 mock 用户/消息/会话数据
 │
 ├── traefik/                         # Traefik 反向代理配置
 ├── docker-compose.yml               # 全栈容器编排（postgres + redis + server + web + traefik）
@@ -84,6 +102,7 @@ cd server && go run cmd/server/main.go  # http://localhost:4007
 | Next.js 前端 | 3000 |
 | Go API 网关 | 4007 |
 | PostgreSQL | 5433 (外部映射) |
+| MongoDB | 27017 |
 | Redis | 6379 |
 | Traefik HTTP | 80 |
 | Traefik Dashboard | 8081 |
@@ -97,7 +116,33 @@ cd server && go run cmd/server/main.go  # http://localhost:4007
 | POST | `/api/auth/login` | 否 | 用户登录，设置 HttpOnly Cookie |
 | POST | `/api/auth/logout` | 否 | 退出登录，清除 Session |
 | GET | `/api/auth/session` | 是 | 获取当前登录用户信息 |
+| GET | `/api/companies` | 否 | 返回公司列表 + 各公司可用渠道 |
+| GET | `/api/wecom/users` | 否 | 查询 wecom_users，按 `company_id` 参数过滤 |
+| GET | `/api/wecom/stats` | 否 | 汇总统计（用户数、消息数、会话数），按 `company_id` 过滤 |
 | GET | `/swagger/*any` | 否 | Swagger API 文档 |
+| GET    | `/api/org/companies`                       | 否 | MongoDB 公司列表 |
+| POST   | `/api/org/companies`                       | 否 | 创建公司 |
+| GET    | `/api/org/companies/:id`                   | 否 | 获取单个公司 |
+| PUT    | `/api/org/companies/:id`                   | 否 | 更新公司 |
+| DELETE | `/api/org/companies/:id`                   | 否 | 删除公司 |
+| GET    | `/api/org/organizations`                   | 否 | 组织节点列表（?company_id=） |
+| POST   | `/api/org/organizations`                   | 否 | 创建组织节点 |
+| GET    | `/api/org/organizations/:id`               | 否 | 获取单个组织节点 |
+| GET    | `/api/org/organizations/tree/:companyId`   | 否 | 获取组织架构树 |
+| PUT    | `/api/org/organizations/:id`               | 否 | 更新组织节点 |
+| DELETE | `/api/org/organizations/:id`               | 否 | 删除组织节点 |
+| GET    | `/api/org/users`                           | 否 | MongoDB 用户列表（?company_id=） |
+| POST   | `/api/org/users`                           | 否 | 创建用户 |
+| GET    | `/api/org/users/:id`                       | 否 | 获取单个用户 |
+| GET    | `/api/org/users/managed/:id`               | 否 | 获取该用户管辖的所有人员 |
+| GET    | `/api/org/users/can-access`                | 否 | 判断能否访问（?manager_id=&target_id=） |
+| PUT    | `/api/org/users/:id`                       | 否 | 更新用户 |
+| DELETE | `/api/org/users/:id`                       | 否 | 删除用户（同时删除 positions） |
+| GET    | `/api/org/positions`                       | 否 | 职位列表（?user_id=&company_id=&org_node_id=） |
+| POST   | `/api/org/positions`                       | 否 | 创建职位 |
+| GET    | `/api/org/positions/:id`                   | 否 | 获取单个职位 |
+| PUT    | `/api/org/positions/:id`                   | 否 | 更新职位 |
+| DELETE | `/api/org/positions/:id`                   | 否 | 删除职位 |
 
 ### 认证流程
 
@@ -106,16 +151,31 @@ cd server && go run cmd/server/main.go  # http://localhost:4007
 
 ### 数据库设计
 
-核心表：`companies` → `departments` → `users` → `user_roles` → `roles` + `company_apps`
+**多公司隔离**：`companies` 表存储公司信息（九峰、福多多），各渠道表通过 `company_id` 字段实现数据隔离。
 
-RBAC 权限通过 `roles.data_scope` 字段控制数据隔离级别（1=公司级, 2=部门级, 3=个人级, 4=默认）
+**渠道表结构**（结构一致，前缀区分渠道）：
+- `wecom_users` / `wecom_messages` / `wecom_chats` / `wecom_events` — 企业微信
+- `dingtalk_users` / `dingtalk_messages` / `dingtalk_chats` / `dingtalk_events` — 钉钉（暂空）
+- `feishu_users` / `feishu_messages` / `feishu_chats` / `feishu_events` — 飞书（暂空）
+- `sales_*` — 销售相关表
+
+**当前状态**：仅 wecom 表有 `company_id` 字段和真实数据，dingtalk/feishu 表暂未启用。
+
+**MongoDB 集合**（用户与组织架构，物化路径模式）：
+- `companies` — 公司信息（name, code, status）
+- `organizations` — 组织节点树（companyId, parentId, path, level, order），path 字段存储从根到自身的物化路径
+- `users` — 平台用户（companyId, name, channelBindings[]）
+- `positions` — 用户职位（userId, orgNodeId, orgNodePath, title, isLeader），orgNodePath 冗余存储以加速管辖范围查询，支持多重身份
+
+MongoDB 用户与 PostgreSQL 渠道用户关系：`users.channelBindings` 中的 `platform + platformUserId` 对应 PostgreSQL 的 `wecom_users.user_id` 等字段。
 
 ### 前端架构
 
-- **路由**：Next.js App Router，`/login` 和 `/dashboard` 两个页面
-- **UI 库**：Ant Design 6 + Tailwind CSS 4
+- **路由**：Next.js App Router，`/login` 登录页 + `/dashboard` 嵌套布局（共享侧边栏），子路由：`overview`（系统概览）、`users`（用户明细）、`analytics`（使用分析）
+- **UI 库**：Ant Design 6 + Tailwind CSS 4，商务风设计（navy/gold 配色、流动渐变背景、玻璃态卡片）
 - **API 调用**：`src/lib/api.ts` 封装了统一的 `fetch` 客户端，401 自动跳转登录
-- **状态管理**：目前使用 React useState，无全局状态库
+- **全局状态**：`AppContext`（`src/lib/AppContext.tsx`）管理当前公司 ID、公司名、渠道选择，Header 中通过 Select 切换，子页面通过 `useApp()` hook 获取
+- **Mock 策略**：企业微信 → 真实 API；钉钉/飞书 → `mockData.ts` 前端 mock
 
 ## 编码规范
 
