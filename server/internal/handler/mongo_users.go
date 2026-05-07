@@ -195,19 +195,17 @@ func getManagedUsers(c *gin.Context) {
 		orConditions[i] = bson.M{"orgNodePath": bson.Regex{Pattern: "^" + p.OrgNodePath}}
 	}
 
-	managedUserIDs, err := repository.PositionsColl().Distinct(ctx, "userId", bson.M{
+	var managedUserIDs []bson.ObjectID
+	distinctResult := repository.PositionsColl().Distinct(ctx, "userId", bson.M{
 		"$or":    orConditions,
 		"status": "active",
 	})
-	if err != nil {
+	if err := distinctResult.Decode(&managedUserIDs); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	objectIDs := make([]bson.ObjectID, len(managedUserIDs))
-	for i, id := range managedUserIDs {
-		objectIDs[i] = id.(bson.ObjectID)
-	}
+	objectIDs := managedUserIDs
 
 	if len(objectIDs) == 0 {
 		c.JSON(http.StatusOK, []model.UserDoc{})
