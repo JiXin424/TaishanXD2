@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/taishanxd/v2/internal/middleware"
@@ -87,7 +88,7 @@ func systemInfo(c *gin.Context) {
 
 // login godoc
 // @Summary      用户登录
-// @Description  通过用户名密码登录，成功后设置 HttpOnly Cookie 并将 Session 写入 Redis
+// @Description  通过用户名密码登录（MongoDB），成功后设置 HttpOnly Cookie 并将 Session 写入 Redis
 // @Tags         认证
 // @Accept       json
 // @Produce      json
@@ -104,50 +105,47 @@ func login(sessionKey string) gin.HandlerFunc {
 			return
 		}
 
-		var user model.User
-		var hash string
-		query := `
-			SELECT u.id, u.username, COALESCE(u.real_name, u.username),
-			       u.company_id, c.name,
-			       COALESCE(r.data_scope, 4)
-			FROM users u
-			JOIN companies c ON c.id = u.company_id
-			LEFT JOIN user_roles ur ON ur.user_id = u.id
-			LEFT JOIN roles r ON r.id = ur.role_id
-			WHERE u.username = $1 AND u.is_active = true
-			LIMIT 1
-		`
-		err := repository.DB.QueryRow(query, req.Username).Scan(
-			&user.ID, &user.Username, &user.RealName,
-			&user.CompanyID, &user.CompanyName, &user.DataScope,
-		)
-		if err != nil {
+		var userDoc model.UserDoc
+		if err := repository.UsersColl().FindOne(
+			c.Request.Context(),
+			bson.M{"username": req.Username, "status": "active"},
+		).Decode(&userDoc); err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 			return
 		}
 
-		err = repository.DB.QueryRow(
-			"SELECT password_hash FROM users WHERE id = $1", user.ID,
-		).Scan(&hash)
-		if err != nil {
+		if err := bcrypt.CompareHashAndPassword([]byte(userDoc.PasswordHash), []byte(req.Password)); err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 			return
 		}
 
-		if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.Password)); err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
+		// Look up company name
+		var company model.CompanyDoc
+		if err := repository.CompaniesColl().FindOne(
+			c.Request.Context(),
+			bson.M{"_id": userDoc.CompanyID},
+		).Decode(&company); err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "company not found"})
 			return
 		}
 
-		user.DisplayName = user.RealName
+		sessionUser := gin.H{
+			"id":          userDoc.ID.Hex(),
+			"username":    userDoc.Username,
+			"name":        userDoc.Name,
+			"companyId":   userDoc.CompanyID.Hex(),
+			"companyName": company.Name,
+			"role":        userDoc.Role,
+			"displayName": userDoc.Name,
+		}
 
 		token := generateToken()
-		sessionData, _ := json.Marshal(user)
+		sessionData, _ := json.Marshal(sessionUser)
 		ctx := context.Background()
 		repository.SetSession(ctx, token, sessionData, 12*time.Hour)
 
 		c.SetCookie("taishan_session", token, 12*3600, "/", "", false, true)
-		c.JSON(http.StatusOK, gin.H{"ok": true, "user": user})
+		c.JSON(http.StatusOK, gin.H{"ok": true, "user": sessionUser})
 	}
 }
 

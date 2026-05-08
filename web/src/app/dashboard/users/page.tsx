@@ -1,101 +1,135 @@
 "use client";
 
-import { useState } from "react";
-import { Table, Card, Input, Tag, Space, Button } from "antd";
-import { SearchOutlined, ReloadOutlined, TeamOutlined } from "@ant-design/icons";
+import { useEffect, useState } from "react";
+import { Table, Input, Space, Spin } from "antd";
+import {
+  SearchOutlined,
+  TeamOutlined,
+} from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
+import { useApp } from "@/lib/AppContext";
+import { api, type WecomUser } from "@/lib/api";
+import { dingtalkMockUsers, feishuMockUsers } from "@/lib/mockData";
 
-interface UserRecord {
-  key: string;
-  id: number;
-  username: string;
-  realName: string;
-  companyName: string;
-  deptName: string;
-  dataScope: number;
-  isActive: boolean;
-}
-
-const mockUsers: UserRecord[] = [
-  { key: "1", id: 1, username: "admin", realName: "管理员", companyName: "泰山销售赋能中心", deptName: "总经办", dataScope: 1, isActive: true },
-  { key: "2", id: 2, username: "zhangsan", realName: "张三", companyName: "泰山销售赋能中心", deptName: "销售一部", dataScope: 2, isActive: true },
-  { key: "3", id: 3, username: "lisi", realName: "李四", companyName: "泰山销售赋能中心", deptName: "销售二部", dataScope: 3, isActive: true },
-  { key: "4", id: 4, username: "wangwu", realName: "王五", companyName: "泰山销售赋能中心", deptName: "销售一部", dataScope: 4, isActive: false },
-];
-
-const dataScopeMap: Record<number, { label: string; color: string }> = {
-  1: { label: "公司级", color: "red" },
-  2: { label: "部门级", color: "orange" },
-  3: { label: "个人级", color: "blue" },
-  4: { label: "默认", color: "default" },
-};
-
-const columns: ColumnsType<UserRecord> = [
-  { title: "ID", dataIndex: "id", width: 60 },
-  { title: "用户名", dataIndex: "username", width: 120 },
-  { title: "姓名", dataIndex: "realName", width: 100 },
-  { title: "公司", dataIndex: "companyName", width: 180 },
-  { title: "部门", dataIndex: "deptName", width: 120 },
+const columns: ColumnsType<WecomUser> = [
   {
-    title: "数据权限",
-    dataIndex: "dataScope",
-    width: 100,
-    render: (scope: number) => {
-      const info = dataScopeMap[scope] || dataScopeMap[4];
-      return <Tag color={info.color}>{info.label}</Tag>;
-    },
+    title: "ID",
+    dataIndex: "id",
+    width: 60,
+    render: (id: number) => <span className="text-[var(--color-text-tertiary)]">#{id}</span>,
   },
   {
-    title: "状态",
-    dataIndex: "isActive",
-    width: 80,
-    render: (active: boolean) => (
-      <Tag color={active ? "green" : "default"}>{active ? "启用" : "禁用"}</Tag>
-    ),
+    title: "姓名",
+    dataIndex: "name",
+    width: 100,
+    render: (name: string) => <span className="font-medium text-[var(--color-text-primary)]">{name}</span>,
+  },
+  {
+    title: "用户ID",
+    dataIndex: "userId",
+    width: 100,
+    render: (id: string) => <span className="text-[var(--color-text-secondary)] font-mono text-xs">{id}</span>,
+  },
+  {
+    title: "手机号",
+    dataIndex: "mobile",
+    width: 130,
+  },
+  {
+    title: "职位",
+    dataIndex: "jobTitle",
+    width: 120,
+    render: (t: string) => <span className="text-[var(--color-text-secondary)]">{t || "-"}</span>,
+  },
+  {
+    title: "部门路径",
+    dataIndex: "departmentPath",
+    width: 180,
+    render: (p: string) => <span className="text-[var(--color-text-secondary)]">{p || "-"}</span>,
   },
 ];
 
 export default function UsersPage() {
+  const { companyId, channel } = useApp();
   const [searchText, setSearchText] = useState("");
+  const [users, setUsers] = useState<WecomUser[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const filteredUsers = mockUsers.filter(
+  useEffect(() => {
+    if (!companyId) return;
+    setLoading(true);
+
+    if (channel === "wecom") {
+      api<WecomUser[]>(`/api/wecom/users?company_id=${companyId}`)
+        .then(setUsers)
+        .catch(() => setUsers([]))
+        .finally(() => setLoading(false));
+    } else if (channel === "dingtalk") {
+      setUsers(dingtalkMockUsers.map((u) => ({ ...u, companyId })));
+      setLoading(false);
+    } else {
+      setUsers(feishuMockUsers.map((u) => ({ ...u, companyId })));
+      setLoading(false);
+    }
+  }, [companyId, channel]);
+
+  const filteredUsers = users.filter(
     (u) =>
-      u.username.includes(searchText) ||
-      u.realName.includes(searchText) ||
-      u.companyName.includes(searchText) ||
-      u.deptName.includes(searchText)
+      u.name.includes(searchText) ||
+      u.userId.includes(searchText) ||
+      u.mobile.includes(searchText) ||
+      u.jobTitle.includes(searchText) ||
+      u.departmentPath.includes(searchText)
   );
 
   return (
-    <>
-      <Card
-        title={
-          <Space>
-            <TeamOutlined />
-            <span>用户明细</span>
-          </Space>
-        }
-        extra={
-          <Space>
-            <Input
-              placeholder="搜索用户名/姓名/部门"
-              prefix={<SearchOutlined />}
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              allowClear
-              style={{ width: 240 }}
-            />
-            <Button icon={<ReloadOutlined />}>刷新</Button>
-          </Space>
-        }
-      >
-        <Table
-          columns={columns}
-          dataSource={filteredUsers}
-          pagination={{ pageSize: 20, showTotal: (total) => `共 ${total} 条` }}
-          size="middle"
-        />
-      </Card>
-    </>
+    <div className="space-y-5">
+      <div className="flex items-center justify-between animate-slide-up">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-[#3b82f6] flex items-center justify-center">
+            <TeamOutlined className="text-white text-sm" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-[var(--color-text-primary)] leading-tight">
+              用户明细
+            </h2>
+            <p className="text-xs text-[var(--color-text-tertiary)]">
+              共 {filteredUsers.length} 位用户
+            </p>
+          </div>
+        </div>
+        <Space size={12}>
+          <Input
+            placeholder="搜索姓名 / 手机 / 职位"
+            prefix={<SearchOutlined className="text-[var(--color-text-tertiary)]" />}
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            allowClear
+            style={{ width: 260 }}
+            className="!rounded-xl"
+          />
+        </Space>
+      </div>
+
+      <div className="unified-card overflow-hidden animate-slide-up" style={{ animationDelay: "0.1s" }}>
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Spin size="large" />
+          </div>
+        ) : (
+          <Table
+            columns={columns}
+            dataSource={filteredUsers.map((u) => ({ ...u, key: u.userId }))}
+            pagination={{
+              pageSize: 20,
+              showTotal: (total) => `共 ${total} 条记录`,
+              className: "!px-2 !pb-2",
+            }}
+            size="middle"
+            className="!border-none"
+          />
+        )}
+      </div>
+    </div>
   );
 }

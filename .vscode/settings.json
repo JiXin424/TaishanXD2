@@ -1,0 +1,15 @@
+{
+    "sqltools.connections": [
+        {
+            "ssh": "Disabled",
+            "previewLimit": 50,
+            "server": "localhost",
+            "port": 5433,
+            "driver": "PostgreSQL",
+            "name": "taishan-postgres",
+            "database": "taishan",
+            "username": "taishan",
+            "password": "taishan_dev"
+        }
+    ]
+}

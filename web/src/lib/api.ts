@@ -15,12 +15,12 @@ export async function api<T>(
 }
 
 export interface AuthUser {
-  id: number;
+  id: string;
   username: string;
-  realName: string;
-  companyId: number;
+  name: string;
+  companyId: string;
   companyName: string;
-  dataScope: number;
+  role: string;
   displayName: string;
 }
 
@@ -34,4 +34,20 @@ export interface SystemInfo {
   goVersion: string;
   startedAt: string;
   environment: string;
+}
+
+export interface WecomUser {
+  id: number;
+  userId: string;
+  name: string;
+  mobile: string;
+  jobTitle: string;
+  departmentPath: string;
+  companyId: string;
+}
+
+export interface WecomStats {
+  totalUsers: number;
+  totalMessages: number;
+  totalChats: number;
 }

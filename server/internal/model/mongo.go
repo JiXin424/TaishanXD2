@@ -73,6 +73,9 @@ type ChannelBinding struct {
 type UserDoc struct {
 	ID              bson.ObjectID `bson:"_id"              json:"id"`
 	CompanyID       bson.ObjectID `bson:"companyId"        json:"companyId"`
+	Username        string             `bson:"username"         json:"username"`
+	PasswordHash    string             `bson:"passwordHash"     json:"-"`
+	Role            string             `bson:"role"             json:"role"`
 	Name            string             `bson:"name"             json:"name"`
 	Phone           string             `bson:"phone"            json:"phone"`
 	Email           string             `bson:"email"            json:"email"`
@@ -85,6 +88,8 @@ type UserDoc struct {
 
 type CreateUserReq struct {
 	CompanyID       string           `json:"companyId"       binding:"required"`
+	Username        string           `json:"username"        binding:"required"`
+	Password        string           `json:"password"        binding:"required"`
 	Name            string           `json:"name"            binding:"required"`
 	Phone           string           `json:"phone"`
 	Email           string           `json:"email"`
@@ -93,6 +98,8 @@ type CreateUserReq struct {
 }
 
 type UpdateUserReq struct {
+	Username        *string          `json:"username"`
+	Password        *string          `json:"password"`
 	Name            *string          `json:"name"`
 	Phone           *string          `json:"phone"`
 	Email           *string          `json:"email"`

@@ -5,3 +5,5 @@
 .data/
 FULL_FEATURE_SPEC.md
 plan.md
+taishan-postgres.session.sql
+changmodel.sh

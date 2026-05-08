@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/v2/bson"
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/taishanxd/v2/internal/model"
 	"github.com/taishanxd/v2/internal/repository"
@@ -79,9 +80,17 @@ func createMongoUser(c *gin.Context) {
 		}
 	}
 
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "password hash failed"})
+		return
+	}
+
 	doc := model.UserDoc{
 		ID:              bson.NewObjectID(),
 		CompanyID:       companyID,
+		Username:        req.Username,
+		PasswordHash:    string(hash),
 		Name:            req.Name,
 		Phone:           req.Phone,
 		Email:           req.Email,
@@ -113,6 +122,17 @@ func updateMongoUser(c *gin.Context) {
 	}
 
 	update := bson.M{"updatedAt": time.Now()}
+	if req.Username != nil {
+		update["username"] = *req.Username
+	}
+	if req.Password != nil {
+		hash, err := bcrypt.GenerateFromPassword([]byte(*req.Password), bcrypt.DefaultCost)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "password hash failed"})
+			return
+		}
+		update["passwordHash"] = string(hash)
+	}
 	if req.Name != nil {
 		update["name"] = *req.Name
 	}

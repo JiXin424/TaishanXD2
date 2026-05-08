@@ -6,6 +6,8 @@ WORKDIR /build
 COPY package.json package-lock.json ./
 RUN npm ci
 
+ARG BACKEND_URL=http://localhost:4007
+ENV BACKEND_URL=$BACKEND_URL
 COPY . .
 RUN npm run build
 
