@@ -93,6 +93,9 @@ func updateMongoCompany(c *gin.Context) {
 	if req.Status != nil {
 		update["status"] = *req.Status
 	}
+	if req.Channel != nil {
+		update["channel"] = *req.Channel
+	}
 
 	result, err := repository.CompaniesColl().UpdateOne(
 		c.Request.Context(),

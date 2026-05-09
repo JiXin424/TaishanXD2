@@ -2,15 +2,18 @@
 
 import { useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { Select, DatePicker, Dropdown } from "antd";
+import { Select, DatePicker, Dropdown, Tag } from "antd";
 import {
   UserOutlined,
   LogoutOutlined,
   DashboardOutlined,
   TeamOutlined,
   BarChartOutlined,
+  LineChartOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  MessageOutlined,
+  CommentOutlined,
 } from "@ant-design/icons";
 import Link from "next/link";
 import {
@@ -19,31 +22,22 @@ import {
   type TimeRange,
   type ChatScope,
 } from "@/lib/AppContext";
-import { channelLabels, channelColors } from "@/lib/mockData";
+
+const channelConfig: Record<string, { label: string; color: string }> = {
+  wecom: { label: "企业微信", color: "#07c160" },
+  wecom_kefu: { label: "微信客服", color: "#07c160" },
+  feishu: { label: "飞书", color: "#3370ff" },
+  dingtalk: { label: "钉钉", color: "#0089ff" },
+};
 
 const menuItems = [
-  {
-    key: "/dashboard/overview",
-    icon: <DashboardOutlined />,
-    label: "系统概览",
-  },
-  {
-    key: "/dashboard/users",
-    icon: <TeamOutlined />,
-    label: "用户明细",
-  },
-  {
-    key: "/dashboard/analytics",
-    icon: <BarChartOutlined />,
-    label: "使用分析",
-  },
+  { key: "/dashboard/overview", icon: <DashboardOutlined />, label: "系统概览" },
+  { key: "/dashboard/insights", icon: <BarChartOutlined />, label: "分析总览" },
+  { key: "/dashboard/users", icon: <TeamOutlined />, label: "用户明细" },
+  { key: "/dashboard/analytics", icon: <LineChartOutlined />, label: "使用分析" },
 ];
 
-function DashboardInner({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+function DashboardInner({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
@@ -56,8 +50,8 @@ function DashboardInner({
     chatScope,
     isSuperAdmin,
     user,
+    stats,
     setCompanyId,
-    setChannel,
     setTimeRange,
     setChatScope,
     customDateRange,
@@ -68,6 +62,8 @@ function DashboardInner({
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     router.push("/login");
   };
+
+  const ch = channelConfig[channel] || channelConfig.wecom;
 
   return (
     <div className="min-h-screen" style={{ background: "var(--color-bg-page)" }}>
@@ -124,15 +120,10 @@ function DashboardInner({
                 >
                   {companyName || "泰山 XD"}
                 </div>
-                <div
-                  style={{
-                    fontSize: 11,
-                    color: "var(--color-primary-600)",
-                    fontWeight: 600,
-                    marginTop: 2,
-                  }}
-                >
-                  {channelLabels[channel] || "EMPOWER CENTER"}
+                <div style={{ marginTop: 2 }}>
+                  <Tag color={ch.color} style={{ fontSize: 10, lineHeight: "16px", padding: "0 6px", margin: 0 }}>
+                    {ch.label}
+                  </Tag>
                 </div>
               </div>
             )}
@@ -161,12 +152,7 @@ function DashboardInner({
                 >
                   <span className="sidebar-link-icon">{item.icon}</span>
                   {!collapsed && (
-                    <span
-                      style={{
-                        fontSize: 14,
-                        fontWeight: 500,
-                      }}
-                    >
+                    <span style={{ fontSize: 14, fontWeight: 500 }}>
                       {item.label}
                     </span>
                   )}
@@ -223,35 +209,15 @@ function DashboardInner({
         >
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             {isSuperAdmin && (
-            <Select
-              value={companyId || undefined}
-              onChange={setCompanyId}
-              style={{ width: 130 }}
-              options={companies.map((c) => ({ value: c.id, label: c.name }))}
-              placeholder="选择公司"
-            />
+              <Select
+                value={companyId || undefined}
+                onChange={setCompanyId}
+                style={{ width: 200 }}
+                options={companies.map((c) => ({ value: c.id, label: c.name }))}
+                placeholder="选择公司"
+              />
             )}
-            <Select
-              value={channel}
-              onChange={setChannel}
-              style={{ width: 130 }}
-              options={Object.entries(channelLabels).map(([value, label]) => ({
-                value,
-                label: (
-                  <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span
-                      style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: "50%",
-                        background: channelColors[value],
-                      }}
-                    />
-                    {label}
-                  </span>
-                ),
-              }))}
-            />
+            <Tag color={ch.color} style={{ margin: 0 }}>{ch.label}</Tag>
             <Select
               value={timeRange}
               onChange={(v: TimeRange) => setTimeRange(v)}
@@ -272,37 +238,31 @@ function DashboardInner({
                 style={{ width: 260 }}
               />
             )}
-            <Select
-              value={chatScope}
-              onChange={(v: ChatScope) => setChatScope(v)}
-              style={{ width: 110 }}
-              options={[
-                { value: "all", label: "全部聊天" },
-                { value: "group", label: "群聊" },
-                { value: "private", label: "私聊" },
-              ]}
-            />
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "6px 12px",
-                borderRadius: "var(--radius-lg)",
-                background: "var(--color-neutral-50)",
-              }}
-            >
-              <div
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background: "#10b981",
-                }}
+            {channel !== "wecom_kefu" && (
+              <Select
+                value={chatScope}
+                onChange={(v: ChatScope) => setChatScope(v)}
+                style={{ width: 110 }}
+                options={[
+                  { value: "all", label: "全部聊天" },
+                  { value: "group", label: "群聊" },
+                  { value: "private", label: "私聊" },
+                ]}
               />
-              <span style={{ fontSize: 12, color: "var(--color-text-tertiary)" }}>
-                系统运行中
-              </span>
+            )}
+            <div style={{ display: "flex", alignItems: "center", gap: 16, marginLeft: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-text-secondary)" }}>
+                <TeamOutlined style={{ color: "var(--color-primary-500)" }} />
+                <span>{stats.totalUsers} 人</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-text-secondary)" }}>
+                <MessageOutlined style={{ color: "var(--color-primary-500)" }} />
+                <span>{stats.totalMessages} 消息</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-text-secondary)" }}>
+                <CommentOutlined style={{ color: "var(--color-primary-500)" }} />
+                <span>{stats.totalChats} 会话</span>
+              </div>
             </div>
           </div>
 
@@ -346,13 +306,7 @@ function DashboardInner({
                 >
                   <UserOutlined />
                 </div>
-                <span
-                  style={{
-                    fontSize: 14,
-                    fontWeight: 500,
-                    color: "var(--color-text-primary)",
-                  }}
-                >
+                <span style={{ fontSize: 14, fontWeight: 500, color: "var(--color-text-primary)" }}>
                   {user?.displayName || "用户"}
                 </span>
               </div>
@@ -376,11 +330,7 @@ function DashboardInner({
   );
 }
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <AppProvider>
       <DashboardInner>{children}</DashboardInner>

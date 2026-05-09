@@ -2,9 +2,45 @@ basePath: /
 definitions:
   model.HealthResponse:
     properties:
+      mongo:
+        type: string
       postgres:
         type: string
       redis:
+        type: string
+    type: object
+  model.KefuCustomer:
+    properties:
+      avatar:
+        type: string
+      externalUserId:
+        type: string
+      lastActiveAt:
+        type: string
+      nickname:
+        type: string
+      totalReceived:
+        type: integer
+      totalSent:
+        type: integer
+    type: object
+  model.KefuMessage:
+    properties:
+      content:
+        type: string
+      createdAt:
+        type: string
+      direction:
+        type: string
+      externalUserId:
+        type: string
+      id:
+        type: integer
+      messageId:
+        type: string
+      msgType:
+        type: string
+      openKfId:
         type: string
     type: object
   model.LoginRequest:
@@ -45,6 +81,33 @@ definitions:
       username:
         type: string
     type: object
+  model.WecomMessage:
+    properties:
+      chatId:
+        type: string
+      chatName:
+        type: string
+      content:
+        type: string
+      createTime:
+        type: integer
+      direction:
+        type: string
+      id:
+        type: integer
+      messageId:
+        type: string
+      msgType:
+        type: string
+      receiveId:
+        type: string
+      receiveIdType:
+        type: string
+      senderId:
+        type: string
+      senderIdType:
+        type: string
+    type: object
 host: localhost:4007
 info:
   contact: {}
@@ -56,7 +119,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: 通过用户名密码登录，成功后设置 HttpOnly Cookie 并将 Session 写入 Redis
+      description: 通过用户名密码登录（MongoDB），成功后设置 HttpOnly Cookie 并将 Session 写入 Redis
       parameters:
       - description: 登录凭据
         in: body
@@ -134,7 +197,7 @@ paths:
       - 认证
   /api/health:
     get:
-      description: 检查 PostgreSQL 和 Redis 连接状态
+      description: 检查 PostgreSQL、Redis 和 MongoDB 连接状态
       produces:
       - application/json
       responses:
@@ -162,6 +225,110 @@ paths:
       summary: 系统信息
       tags:
       - 系统
+  /api/wecom/kefu-customers:
+    get:
+      description: 返回所有客服客户，包含消息统计和最后活跃时间
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.KefuCustomer'
+            type: array
+      summary: 客服客户列表
+      tags:
+      - 企业微信
+  /api/wecom/kefu-messages:
+    get:
+      description: 根据 external_userid 查询微信客服消息，包含用户提问（received）和机器人回复（sent），支持时间范围筛选
+      parameters:
+      - description: 外部用户ID
+        in: query
+        name: external_userid
+        required: true
+        type: string
+      - description: 起始时间（RFC3339 格式，如 2026-05-01T00:00:00Z）
+        in: query
+        name: start_time
+        type: string
+      - description: 截止时间（RFC3339 格式）
+        in: query
+        name: end_time
+        type: string
+      - default: 100
+        description: 返回条数（最大 500）
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.KefuMessage'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 查询客服聊天记录
+      tags:
+      - 企业微信
+  /api/wecom/messages:
+    get:
+      description: 根据企业微信 platform_user_id 查询该用户相关的所有消息（作为发送者或接收者），支持时间范围和会话类型筛选
+      parameters:
+      - description: 企业微信用户ID（如 GuoTongJia）
+        in: query
+        name: platform_user_id
+        required: true
+        type: string
+      - description: MongoDB 公司 ID（可选，不传则不过滤公司）
+        in: query
+        name: company_id
+        type: string
+      - description: 起始时间（毫秒时间戳）
+        in: query
+        name: start_time
+        type: string
+      - description: 截止时间（毫秒时间戳）
+        in: query
+        name: end_time
+        type: string
+      - default: all
+        description: 会话类型：all / group / private
+        in: query
+        name: scope
+        type: string
+      - default: 100
+        description: 返回条数（最大 500）
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.WecomMessage'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 查询用户聊天记录
+      tags:
+      - 企业微信
 securityDefinitions:
   BearerAuth:
     in: header

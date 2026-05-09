@@ -26,6 +26,8 @@ func RegisterRoutes(r *gin.Engine, sessionKey string) {
 	r.GET("/api/system/info", systemInfo)
 	r.POST("/api/auth/login", login(sessionKey))
 	r.POST("/api/auth/logout", logout)
+	r.GET("/api/analytics/usage", getAnalytics)
+	RegisterAnalysisProxyRoutes(r)
 
 	auth := r.Group("/api")
 	auth.Use(middleware.AuthRequired())
@@ -120,21 +122,30 @@ func login(sessionKey string) gin.HandlerFunc {
 		}
 
 		// Look up company name
-		var company model.CompanyDoc
-		if err := repository.CompaniesColl().FindOne(
-			c.Request.Context(),
-			bson.M{"_id": userDoc.CompanyID},
-		).Decode(&company); err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "company not found"})
-			return
+		var companyName string
+		var companyID string
+		if userDoc.CompanyID.IsZero() && userDoc.Role == "super_admin" {
+			companyName = ""
+			companyID = ""
+		} else {
+			var company model.CompanyDoc
+			if err := repository.CompaniesColl().FindOne(
+				c.Request.Context(),
+				bson.M{"_id": userDoc.CompanyID},
+			).Decode(&company); err != nil {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "company not found"})
+				return
+			}
+			companyName = company.Name
+			companyID = userDoc.CompanyID.Hex()
 		}
 
 		sessionUser := gin.H{
 			"id":          userDoc.ID.Hex(),
 			"username":    userDoc.Username,
 			"name":        userDoc.Name,
-			"companyId":   userDoc.CompanyID.Hex(),
-			"companyName": company.Name,
+			"companyId":   companyID,
+			"companyName": companyName,
 			"role":        userDoc.Role,
 			"displayName": userDoc.Name,
 		}
@@ -182,13 +193,13 @@ func currentSession(c *gin.Context) {
 		return
 	}
 
-	var user model.User
-	if err := json.Unmarshal([]byte(data.(string)), &user); err != nil {
+	var sessionUser map[string]interface{}
+	if err := json.Unmarshal([]byte(data.(string)), &sessionUser); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "session parse error"})
 		return
 	}
 
-	c.JSON(http.StatusOK, user)
+	c.JSON(http.StatusOK, gin.H{"ok": true, "user": sessionUser})
 }
 
 func generateToken() string {

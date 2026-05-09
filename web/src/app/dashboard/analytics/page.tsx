@@ -1,178 +1,276 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Row, Col, Space, Spin } from "antd";
+import { useEffect, useState, useMemo } from "react";
+import { Row, Col, Spin, Empty, Result } from "antd";
+import { BarChartOutlined, InboxOutlined } from "@ant-design/icons";
 import {
-  BarChartOutlined,
-  UserOutlined,
-  MessageOutlined,
-  TeamOutlined,
-  CommentOutlined,
-} from "@ant-design/icons";
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+} from "recharts";
 import { useApp } from "@/lib/AppContext";
-import { api, type WecomStats } from "@/lib/api";
-import { dingtalkMockStats, feishuMockStats } from "@/lib/mockData";
+import {
+  fetchAnalytics,
+  type AnalyticsData,
+  type UserCount,
+  type UserToken,
+  type TimeBucket,
+  type HourBucket,
+} from "@/lib/api";
 
-function formatNumber(n: number) {
-  if (n >= 10000) return `${(n / 10000).toFixed(1)}万`;
-  return n.toLocaleString();
-}
+const COLORS = [
+  "#6366f1",
+  "#8b5cf6",
+  "#a78bfa",
+  "#c4b5fd",
+  "#3b82f6",
+  "#60a5fa",
+  "#93c5fd",
+  "#10b981",
+  "#34d399",
+  "#6ee7b7",
+  "#f59e0b",
+  "#fbbf24",
+  "#f97316",
+  "#fb923c",
+  "#ef4444",
+  "#f87171",
+  "#ec4899",
+  "#f472b6",
+  "#14b8a6",
+  "#2dd4bf",
+];
+
+const SUPPORTED_CHANNELS = ["wecom", "wecom_kefu"];
+
+const emptyData: AnalyticsData = {
+  userConversations: [],
+  userTokens: [],
+  conversationVolume: [],
+  timeDistribution: [],
+};
 
 export default function AnalyticsPage() {
-  const { companyId, channel } = useApp();
-  const [stats, setStats] = useState<WecomStats | null>(null);
+  const { channel, timeRange, chatScope, customDateRange } = useApp();
+  const [data, setData] = useState<AnalyticsData>(emptyData);
   const [loading, setLoading] = useState(false);
 
+  const channelSupported = SUPPORTED_CHANNELS.includes(channel);
+
   useEffect(() => {
-    if (!companyId) return;
-    setLoading(true);
-
-    if (channel === "wecom") {
-      api<WecomStats>(`/api/wecom/stats?company_id=${companyId}`)
-        .then(setStats)
-        .catch(() => setStats({ totalUsers: 0, totalMessages: 0, totalChats: 0 }))
-        .finally(() => setLoading(false));
-    } else if (channel === "dingtalk") {
-      setStats(dingtalkMockStats);
-      setLoading(false);
-    } else {
-      setStats(feishuMockStats);
-      setLoading(false);
+    if (!channelSupported) {
+      setData(emptyData);
+      return;
     }
-  }, [companyId, channel]);
+    setLoading(true);
+    fetchAnalytics({
+      channel,
+      timeRange,
+      chatScope,
+      startDate: timeRange === "custom" ? customDateRange?.[0] : undefined,
+      endDate: timeRange === "custom" ? customDateRange?.[1] : undefined,
+    })
+      .then(setData)
+      .catch(() => setData(emptyData))
+      .finally(() => setLoading(false));
+  }, [channel, timeRange, chatScope, customDateRange, channelSupported]);
 
-  const cards = stats
-    ? [
-        {
-          title: "用户总数",
-          value: stats.totalUsers,
-          suffix: "人",
-          icon: <UserOutlined />,
-          color: "#3b82f6",
-          bg: "#eff6ff",
-        },
-        {
-          title: "消息总数",
-          value: stats.totalMessages,
-          suffix: "条",
-          icon: <MessageOutlined />,
-          color: "#10b981",
-          bg: "#ecfdf5",
-        },
-        {
-          title: "会话群数",
-          value: stats.totalChats,
-          suffix: "个",
-          icon: <CommentOutlined />,
-          color: "#f59e0b",
-          bg: "#fffbeb",
-        },
-        {
-          title: "活跃用户",
-          value: Math.max(Math.floor(stats.totalUsers * 0.6), 1),
-          suffix: "人",
-          icon: <TeamOutlined />,
-          color: "#8b5cf6",
-          bg: "#f5f3ff",
-        },
-      ]
-    : [];
+  if (!channelSupported) {
+    return (
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
+        <Result icon={<InboxOutlined />} title="该渠道暂不支持使用分析" />
+      </div>
+    );
+  }
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-32">
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
         <Spin size="large" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between animate-slide-up">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-[#8b5cf6] flex items-center justify-center">
-            <BarChartOutlined className="text-white text-sm" />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold text-[var(--color-text-primary)] leading-tight">
-              使用分析
-            </h2>
-            <p className="text-xs text-[var(--color-text-tertiary)]">数据统计与趋势概览</p>
-          </div>
-        </div>
-      </div>
-
+    <div>
       <Row gutter={[20, 20]}>
-        {cards.map((card, i) => (
-          <Col span={6} key={card.title}>
-            <div
-              className="unified-card p-5 stat-card animate-slide-up"
-              style={{ animationDelay: `${0.08 + i * 0.06}s` }}
-            >
-              <div className="flex items-start justify-between mb-4">
-                <span className="text-sm text-[var(--color-text-secondary)] font-medium">
-                  {card.title}
-                </span>
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center"
-                  style={{ background: card.bg, color: card.color }}
-                >
-                  {card.icon}
-                </div>
-              </div>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-[28px] font-bold text-[var(--color-text-primary)] leading-none">
-                  {formatNumber(card.value)}
-                </span>
-                <span className="text-sm text-[var(--color-text-tertiary)]">{card.suffix}</span>
-              </div>
-            </div>
-          </Col>
-        ))}
-      </Row>
-
-      <Row gutter={[20, 20]}>
-        <Col span={12}>
-          <div
-            className="unified-card p-6 animate-slide-up"
-            style={{ animationDelay: "0.36s" }}
-          >
-            <span className="text-sm font-semibold text-[var(--color-text-primary)] block mb-5">
-              消息趋势
-            </span>
-            <div className="h-64 flex items-center justify-center rounded-xl bg-[var(--color-bg-page)]">
-              <Space direction="vertical" align="center">
-                <div className="w-14 h-14 rounded-2xl bg-[rgba(139,92,246,0.08)] flex items-center justify-center">
-                  <BarChartOutlined style={{ fontSize: 24, color: "#c4b5fd" }} />
-                </div>
-                <span className="text-sm text-[var(--color-text-tertiary)]">
-                  图表区域（待接入 Recharts）
-                </span>
-              </Space>
-            </div>
-          </div>
+        <Col xs={24} lg={12}>
+          <ChartCard title="用户会话数排行" delay="0ms">
+            <UserConversationChart data={data.userConversations} />
+          </ChartCard>
         </Col>
-        <Col span={12}>
-          <div
-            className="unified-card p-6 animate-slide-up"
-            style={{ animationDelay: "0.44s" }}
-          >
-            <span className="text-sm font-semibold text-[var(--color-text-primary)] block mb-5">
-              用户活跃度分布
-            </span>
-            <div className="h-64 flex items-center justify-center rounded-xl bg-[var(--color-bg-page)]">
-              <Space direction="vertical" align="center">
-                <div className="w-14 h-14 rounded-2xl bg-[rgba(59,130,246,0.08)] flex items-center justify-center">
-                  <BarChartOutlined style={{ fontSize: 24, color: "#93c5fd" }} />
-                </div>
-                <span className="text-sm text-[var(--color-text-tertiary)]">
-                  图表区域（待接入 Recharts）
-                </span>
-              </Space>
-            </div>
-          </div>
+        <Col xs={24} lg={12}>
+          <ChartCard title="用户 Token 消耗排行" delay="80ms">
+            <UserTokenChart data={data.userTokens} />
+          </ChartCard>
+        </Col>
+        <Col xs={24} lg={12}>
+          <ChartCard title="对话量趋势" delay="160ms">
+            <VolumeChart data={data.conversationVolume} />
+          </ChartCard>
+        </Col>
+        <Col xs={24} lg={12}>
+          <ChartCard title="时段分布" delay="240ms">
+            <TimeDistChart data={data.timeDistribution} />
+          </ChartCard>
         </Col>
       </Row>
     </div>
+  );
+}
+
+function ChartCard({
+  title,
+  children,
+  delay,
+}: {
+  title: string;
+  children: React.ReactNode;
+  delay: string;
+}) {
+  return (
+    <div
+      className="unified-card p-6 animate-slide-up"
+      style={{ animationDelay: delay }}
+    >
+      <span className="text-sm font-semibold text-[var(--color-text-primary)] block mb-5">
+        {title}
+      </span>
+      {children}
+    </div>
+  );
+}
+
+function UserConversationChart({ data }: { data: UserCount[] | null }) {
+  if (!data || data.length === 0) {
+    return (
+      <div className="h-64 flex items-center justify-center">
+        <Empty description="暂无数据" />
+      </div>
+    );
+  }
+  return (
+    <ResponsiveContainer width="100%" height={data.length * 48 + 20}>
+      <BarChart data={data} layout="vertical" margin={{ top: 5, right: 50, left: 10, bottom: 5 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-subtle)" horizontal={false} />
+        <XAxis type="number" tick={{ fontSize: 11 }} />
+        <YAxis type="category" dataKey="userName" tick={{ fontSize: 12 }} width={80} />
+        <Tooltip
+          formatter={(value) => [`${value} 条`, "会话数"]}
+          contentStyle={{
+            borderRadius: 8,
+            border: "1px solid var(--color-border-default)",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+          }}
+        />
+        <Bar dataKey="count" radius={[0, 4, 4, 0]} maxBarSize={28}>
+          {data.map((_, i) => (
+            <Cell key={i} fill={COLORS[i % COLORS.length]} />
+          ))}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+function UserTokenChart({ data }: { data: UserToken[] | null }) {
+  if (!data || data.length === 0) {
+    return (
+      <div className="h-64 flex items-center justify-center">
+        <Empty description="暂无数据" />
+      </div>
+    );
+  }
+  return (
+    <ResponsiveContainer width="100%" height={data.length * 48 + 20}>
+      <BarChart data={data} layout="vertical" margin={{ top: 5, right: 50, left: 10, bottom: 5 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-subtle)" horizontal={false} />
+        <XAxis type="number" tick={{ fontSize: 11 }} />
+        <YAxis type="category" dataKey="userName" tick={{ fontSize: 12 }} width={80} />
+        <Tooltip
+          formatter={(value) => [`${value} tokens`, "Token 消耗"]}
+          contentStyle={{
+            borderRadius: 8,
+            border: "1px solid var(--color-border-default)",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+          }}
+        />
+        <Bar dataKey="tokens" radius={[0, 4, 4, 0]} maxBarSize={28}>
+          {data.map((_, i) => (
+            <Cell key={i} fill={COLORS[i % COLORS.length]} />
+          ))}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+function VolumeChart({ data }: { data: TimeBucket[] | null }) {
+  if (!data || data.length === 0) {
+    return (
+      <div className="h-64 flex items-center justify-center">
+        <Empty description="暂无数据" />
+      </div>
+    );
+  }
+  return (
+    <ResponsiveContainer width="100%" height={280}>
+      <BarChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-subtle)" />
+        <XAxis
+          dataKey="label"
+          tick={{ fontSize: 11 }}
+          angle={data.length > 15 ? -45 : 0}
+          textAnchor={data.length > 15 ? "end" : "middle"}
+          height={data.length > 15 ? 70 : 40}
+        />
+        <YAxis tick={{ fontSize: 11 }} />
+        <Tooltip
+          formatter={(value) => [`${value} 条`, "对话量"]}
+          contentStyle={{
+            borderRadius: 8,
+            border: "1px solid var(--color-border-default)",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+          }}
+        />
+        <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={40} />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+function TimeDistChart({ data }: { data: HourBucket[] | null }) {
+  const filled = useMemo(() => {
+    const safe = data || [];
+    const map = new Map(safe.map((d) => [d.hour, d.count]));
+    const result: { hour: number; count: number; label: string }[] = [];
+    for (let h = 0; h < 24; h++) {
+      result.push({ hour: h, count: map.get(h) || 0, label: `${h}:00` });
+    }
+    return result;
+  }, [data || []]);
+
+  return (
+    <ResponsiveContainer width="100%" height={280}>
+      <BarChart data={filled} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-subtle)" />
+        <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={1} />
+        <YAxis tick={{ fontSize: 11 }} />
+        <Tooltip
+          formatter={(value) => [`${value} 条`, "消息数"]}
+          contentStyle={{
+            borderRadius: 8,
+            border: "1px solid var(--color-border-default)",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+          }}
+        />
+        <Bar dataKey="count" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={30} />
+      </BarChart>
+    </ResponsiveContainer>
   );
 }

@@ -12,6 +12,7 @@ type CompanyDoc struct {
 	ID        bson.ObjectID `bson:"_id"      json:"id"`
 	Name      string             `bson:"name"     json:"name"`
 	Code      string             `bson:"code"     json:"code"`
+	Channel   string             `bson:"channel"  json:"channel"`
 	Status    string             `bson:"status"   json:"status"`
 	CreatedAt time.Time          `bson:"createdAt" json:"createdAt"`
 	UpdatedAt time.Time          `bson:"updatedAt" json:"updatedAt"`
@@ -23,9 +24,10 @@ type CreateCompanyReq struct {
 }
 
 type UpdateCompanyReq struct {
-	Name   *string `json:"name"`
-	Code   *string `json:"code"`
-	Status *string `json:"status"`
+	Name    *string `json:"name"`
+	Code    *string `json:"code"`
+	Status  *string `json:"status"`
+	Channel *string `json:"channel"`
 }
 
 // ── Organizations ──────────────────────────────────────────────

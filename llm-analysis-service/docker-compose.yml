@@ -1,0 +1,18 @@
+services:
+  llm-analysis:
+    build: .
+    container_name: dify-dashboard-llm-analysis
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      # 容器内需要覆盖的值（.env 中的 localhost 在容器内不可达）
+      - PG_HOST=host.docker.internal
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    external: true
+    name: app-network

@@ -306,6 +306,199 @@ body {
   opacity: 0;
 }
 
+/* ── Export Mode: Starlight Pop ──────────────────────────── */
+
+/* Container — quick fade to reveal the stage */
+.export-checkbox-cell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  animation: exportCellReveal 0.2s ease both;
+}
+
+@keyframes exportCellReveal {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Burst flash — a bright point that explodes outward */
+.export-checkbox-cell::before {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.95), var(--color-primary-400));
+  animation: exportFlashBurst 0.6s ease-out both;
+  animation-delay: inherit;
+  z-index: 0;
+}
+
+@keyframes exportFlashBurst {
+  0% {
+    opacity: 1;
+    transform: scale(0);
+    box-shadow: 0 0 8px 2px rgba(59, 94, 245, 0.8),
+                0 0 20px 4px rgba(59, 94, 245, 0.4);
+  }
+  25% {
+    opacity: 0.9;
+    transform: scale(1.8);
+    box-shadow: 0 0 18px 6px rgba(59, 94, 245, 0.5),
+                0 0 44px 10px rgba(59, 94, 245, 0.2);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(4.5);
+    box-shadow: 0 0 30px 12px rgba(59, 94, 245, 0);
+  }
+}
+
+/* Ripple ring — expanding concentric circle */
+.export-checkbox-cell::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2.5px solid var(--color-primary-300);
+  animation: exportRipple 0.7s ease-out both;
+  animation-delay: inherit;
+  z-index: 0;
+}
+
+@keyframes exportRipple {
+  0% {
+    opacity: 0.8;
+    transform: scale(0.2);
+    border-width: 3px;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(3.5);
+    border-width: 0.5px;
+  }
+}
+
+/* Checkbox itself — spins in from the void */
+.export-checkbox-cell .ant-checkbox-wrapper {
+  position: relative;
+  z-index: 1;
+  animation: exportCheckSpin 0.65s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: inherit;
+}
+
+@keyframes exportCheckSpin {
+  0% {
+    opacity: 0;
+    transform: rotate(-270deg) scale(0);
+    filter: blur(6px);
+  }
+  30% {
+    opacity: 1;
+    filter: blur(0);
+  }
+  50% {
+    transform: rotate(25deg) scale(1.35);
+  }
+  70% {
+    transform: rotate(-10deg) scale(0.9);
+  }
+  85% {
+    transform: rotate(4deg) scale(1.06);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(0deg) scale(1);
+    filter: blur(0);
+  }
+}
+
+/* Avatar wrapper — holds avatar + selection ring */
+.export-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.export-avatar-wrap.export-bounce {
+  animation: avatarBounce 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes avatarBounce {
+  0% { transform: scale(1); }
+  40% { transform: scale(0.82); }
+  70% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+/* Selection ring around avatar */
+.export-selected-ring {
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 2.5px solid var(--color-primary-500);
+  box-shadow: 0 0 0 3px rgba(59, 94, 245, 0.15),
+              0 0 16px rgba(59, 94, 245, 0.2);
+  animation: ringAppear 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+             ringPulse 2s ease-in-out infinite 0.35s;
+  pointer-events: none;
+}
+
+@keyframes ringAppear {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes ringPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 3px rgba(59, 94, 245, 0.15),
+                0 0 16px rgba(59, 94, 245, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(59, 94, 245, 0.08),
+                0 0 24px rgba(59, 94, 245, 0.12);
+  }
+}
+
+/* Selected row background tint */
+.export-row-selected > td {
+  background: rgba(59, 94, 245, 0.04) !important;
+  transition: background 0.3s ease;
+}
+
+/* Header action buttons entrance */
+.export-header-actions {
+  animation: headerSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes headerSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 /* ── Topbar ─────────────────────────────────────────────── */
 .topbar-inner {
   backdrop-filter: blur(12px);

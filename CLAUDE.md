@@ -4,7 +4,7 @@
 
 全栈数据分析看板，核心功能：展示和分析 Dify 工作流使用数据、钉钉集成、Langfuse 评分、LLM 智能分析报告生成、多租户 RBAC 数据权限隔离。
 
-当前状态：基础认证 + Dashboard 框架 + 多公司/渠道切换（超管视角）已搭建完成。企业微信对接真实数据库，钉钉/飞书使用前端 mock。
+当前状态：基础认证 + Dashboard 框架 + 多公司固定渠道已搭建完成。每个公司绑定一个渠道（泰山兄弟=企微，九峰=飞书，福多多=钉钉）。企业微信客服聊天记录已打通，MongoDB user 通过 channelBindings 同时存储内部员工 ID 和客服 external_userid。
 
 ## 技术栈
 
@@ -13,7 +13,7 @@
 | 前端 | Next.js 16 (App Router) + React 19 + Ant Design 6 + Tailwind CSS 4 + TypeScript 5 |
 | 后端 | Go 1.26 + Gin + PostgreSQL 16 (lib/pq) + Redis 7 (go-redis/v9) |
 | 数据库 | MongoDB 7 (mongo-driver/v2) — 用户、组织架构、权限数据 |
-| AI 服务 | Python FastAPI + DashScope Qwen（计划中，未实现） |
+| AI 服务 | Python FastAPI + DashScope Qwen — 六段式使用分析报告（Map-Reduce 架构） |
 | 网关 | Traefik v3.3 |
 | 部署 | Docker Compose 多容器编排 |
 
@@ -32,6 +32,7 @@ TaishanXD2/
 │   │   ├── handler/mongo_organizations.go # MongoDB 组织架构 CRUD + 树
 │   │   ├── handler/mongo_users.go        # MongoDB 用户 CRUD + 管辖范围查询
 │   │   ├── handler/mongo_positions.go    # MongoDB 职位 CRUD
+│   │   ├── handler/analytics.go          # 使用分析 API（聚合查询：会话数/Token/对话量/时段分布）
 │   │   ├── middleware/
 │   │   │   ├── auth.go              # 认证中间件（Cookie + Bearer Token → Redis Session）
 │   │   │   └── cors.go              # CORS 跨域配置
@@ -55,7 +56,7 @@ TaishanXD2/
 │   │   │       ├── layout.tsx               # Dashboard 共享布局（侧边栏 + Header）
 │   │   │       ├── page.tsx                 # 重定向到 /dashboard/overview
 │   │   │       ├── overview/page.tsx        # 系统概览（健康检查、系统信息）
-│   │   │       ├── users/page.tsx           # 用户明细（表格 + 搜索）
+│   │   │       ├── users/page.tsx           # 用户明细（表格 + 搜索 + 聊天记录 Drawer）
 │   │   │       └── analytics/page.tsx       # 使用分析（统计卡片 + 图表占位）
 │   │   ├── lib/api.ts               # HTTP 客户端封装 + TypeScript 类型定义
 │   │   ├── lib/AppContext.tsx        # 全局状态 Context（当前公司 ID + 渠道选择）
@@ -69,6 +70,15 @@ TaishanXD2/
 │       └── init/002_companies.sql   # companies 表 + 种子数据（九峰、福多多）
 │       └── init/003_wecom_company.sql  # wecom 表加 company_id 字段 + 索引
 │       └── init/004_wecom_mock_data.sql  # 企业微信 mock 用户/消息/会话数据
+│       └── init/005_llm_analysis_log.sql # LLM 分析报告持久化表
+│
+├── llm-analysis-service/               # Python FastAPI 大模型分析服务
+│   ├── main.py                         # FastAPI 入口（路由、CORS）
+│   ├── engine.py                       # LLM 分析引擎（Map-Reduce + DashScope）
+│   ├── models.py                       # Pydantic 数据模型（六段式报告）
+│   ├── requirements.txt                # Python 依赖
+│   ├── Dockerfile                      # Python 容器构建
+│   └── .env                            # DashScope + PostgreSQL 配置
 │
 ├── traefik/                         # Traefik 反向代理配置
 ├── docker-compose.yml               # 全栈容器编排（postgres + redis + server + web + traefik）
@@ -119,6 +129,9 @@ cd server && go run cmd/server/main.go  # http://localhost:4007
 | GET | `/api/companies` | 否 | 返回公司列表 + 各公司可用渠道 |
 | GET | `/api/wecom/users` | 否 | 查询 wecom_users，按 `company_id` 参数过滤 |
 | GET | `/api/wecom/stats` | 否 | 汇总统计（用户数、消息数、会话数），按 `company_id` 过滤 |
+| GET | `/api/wecom/messages` | 否 | 查询用户聊天记录，参数：`platform_user_id`（必填）、`company_id`（可选）、`start_time`/`end_time`（毫秒时间戳）、`scope`（all/group/private）、`limit` |
+| GET | `/api/wecom/kefu-messages` | 否 | 查询客服聊天记录，参数：`external_userid`（必填）、`start_time`/`end_time`（RFC3339）、`limit` |
+| GET | `/api/wecom/kefu-customers` | 否 | 客服客户列表（含消息统计） |
 | GET | `/swagger/*any` | 否 | Swagger API 文档 |
 | GET    | `/api/org/companies`                       | 否 | MongoDB 公司列表 |
 | POST   | `/api/org/companies`                       | 否 | 创建公司 |
@@ -143,6 +156,9 @@ cd server && go run cmd/server/main.go  # http://localhost:4007
 | GET    | `/api/org/positions/:id`                   | 否 | 获取单个职位 |
 | PUT    | `/api/org/positions/:id`                   | 否 | 更新职位 |
 | DELETE | `/api/org/positions/:id`                   | 否 | 删除职位 |
+| GET    | `/api/analytics/usage`                     | 否 | 使用分析聚合数据（按渠道/时间/聊天类型筛选，返回 4 组图表数据） |
+| POST   | `/api/analysis/analyze`                    | 否 | 触发 LLM 分析（Go 代理→查消息→转发 Python 服务→返回六段式报告） |
+| GET    | `/api/analysis/history`                    | 否 | 查询分析历史记录（参数：app_id, company_id, limit） |
 
 ### 认证流程
 
@@ -162,9 +178,11 @@ cd server && go run cmd/server/main.go  # http://localhost:4007
 **当前状态**：仅 wecom 表有 `company_id` 字段和真实数据，dingtalk/feishu 表暂未启用。
 
 **MongoDB 集合**（用户与组织架构，物化路径模式）：
-- `companies` — 公司信息（name, code, status）
+- `companies` — 公司信息（name, code, channel, status），channel 字段固定该公司使用的渠道（wecom/feishu/dingtalk）
 - `organizations` — 组织节点树（companyId, parentId, path, level, order），path 字段存储从根到自身的物化路径
-- `users` — 平台用户（companyId, name, channelBindings[]）
+- `users` — 平台用户（companyId, name, channelBindings[]），channelBindings 存储多渠道身份：
+  - `{platform: "wecom", platformUserId: "GuoTongJia"}` — 企微内部员工 ID
+  - `{platform: "wecom_kefu", platformUserId: "wmpQbHEA..."}` — 企微客服外部用户 ID（用于查聊天记录）
 - `positions` — 用户职位（userId, orgNodeId, orgNodePath, title, isLeader），orgNodePath 冗余存储以加速管辖范围查询，支持多重身份
 
 MongoDB 用户与 PostgreSQL 渠道用户关系：`users.channelBindings` 中的 `platform + platformUserId` 对应 PostgreSQL 的 `wecom_users.user_id` 等字段。
