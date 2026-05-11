@@ -7,8 +7,6 @@ import {
   Space,
   Spin,
   Button,
-  Drawer,
-  Empty,
   Tag,
   Checkbox,
 } from "antd";
@@ -22,8 +20,9 @@ import {
   CloseOutlined,
 } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
+import { useRouter } from "next/navigation";
 import { useApp } from "@/lib/AppContext";
-import { api, type KefuMessage, type KefuCustomer } from "@/lib/api";
+import { api, type KefuCustomer } from "@/lib/api";
 
 // ── Shared types ──────────────────────────────────────────────────
 
@@ -39,202 +38,17 @@ interface OrgUser {
   channelBindings: { platform: string; platformUserId: string; platformUserName: string }[];
 }
 
-// ── Helpers ───────────────────────────────────────────────────────
-
-function parseKefuContent(raw: string): string {
-  try {
-    const obj = JSON.parse(raw);
-    if (obj.text?.content) return obj.text.content;
-    if (obj.voice) return "[语音消息]";
-    if (obj.image) return "[图片]";
-    if (obj.event) return "[进入会话]";
-    if (typeof obj.text === "string") return obj.text;
-    return raw;
-  } catch {
-    return raw;
-  }
-}
-
-function highlightText(text: string, keyword: string) {
-  if (!keyword) return text;
-  const parts = text.split(keyword);
-  return parts.map((part, i) =>
-    i < parts.length - 1 ? (
-      <span key={i}>
-        {part}
-        <mark className="bg-yellow-200 text-[var(--color-text-primary)] rounded px-0.5">
-          {keyword}
-        </mark>
-      </span>
-    ) : (
-      <span key={i}>{part}</span>
-    )
-  );
-}
-
-// ── ChatDrawer (works for both OrgUser and kefu customer) ─────────
-
-interface ChatTarget {
-  externalUserId: string;
-  name: string;
-  avatar?: string;
-}
-
-function ChatDrawer({
-  target,
-  open,
-  onClose,
-}: {
-  target: ChatTarget | null;
-  open: boolean;
-  onClose: () => void;
-}) {
-  const { timeRange, customDateRange } = useApp();
-  const [messages, setMessages] = useState<KefuMessage[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [msgSearch, setMsgSearch] = useState("");
-
-  const filteredMessages = msgSearch
-    ? messages.filter((m) => parseKefuContent(m.content).includes(msgSearch))
-    : messages;
-
-  useEffect(() => {
-    if (!open || !target) return;
-    setMsgSearch("");
-    setLoading(true);
-
-    const params = new URLSearchParams({
-      external_userid: target.externalUserId,
-    });
-
-    if (timeRange === "custom" && customDateRange) {
-      params.set("start_time", new Date(customDateRange[0]).toISOString());
-      params.set("end_time", new Date(customDateRange[1]).toISOString());
-    } else {
-      const now = new Date();
-      let start: Date;
-      if (timeRange === "yesterday") {
-        start = new Date(now);
-        start.setDate(start.getDate() - 1);
-      } else if (timeRange === "last_week") {
-        start = new Date(now);
-        start.setDate(start.getDate() - 7);
-      } else {
-        start = new Date(now);
-        start.setDate(start.getDate() - 30);
-      }
-      start.setHours(0, 0, 0, 0);
-      params.set("start_time", start.toISOString());
-    }
-
-    api<KefuMessage[]>(`/api/wecom/kefu-messages?${params}`)
-      .then(setMessages)
-      .catch(() => setMessages([]))
-      .finally(() => setLoading(false));
-  }, [open, target, timeRange, customDateRange]);
-
-  const displayName = target?.name || "客户";
-
-  return (
-    <Drawer
-      title={
-        <div className="flex items-center gap-2">
-          <MessageOutlined />
-          <span>{displayName} 的对话</span>
-        </div>
-      }
-      placement="right"
-      size="large"
-      open={open}
-      onClose={onClose}
-      styles={{
-        body: { padding: "0 16px 16px", display: "flex", flexDirection: "column", height: "100%" },
-      }}
-    >
-      {!target ? (
-        <Empty description="未选择用户" />
-      ) : (
-        <>
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs text-[var(--color-text-tertiary)]">
-              {msgSearch ? `${filteredMessages.length} / ` : ""}{messages.length} 条消息
-            </span>
-          </div>
-
-          <Input
-            placeholder="搜索聊天内容"
-            prefix={<SearchOutlined className="text-[var(--color-text-tertiary)]" />}
-            value={msgSearch}
-            onChange={(e) => setMsgSearch(e.target.value)}
-            allowClear
-            className="!rounded-lg mb-4"
-          />
-
-          {loading ? (
-            <div className="flex items-center justify-center py-20">
-              <Spin />
-            </div>
-          ) : filteredMessages.length === 0 ? (
-            <Empty description={msgSearch ? "未找到匹配的消息" : "暂无聊天记录"} />
-          ) : (
-            <div className="flex-1 overflow-y-auto space-y-3">
-              {filteredMessages.map((msg) => {
-                const isUser = msg.direction === "received";
-                const text = parseKefuContent(msg.content);
-
-                return (
-                  <div key={msg.id} className={`flex ${isUser ? "justify-start" : "justify-end"}`}>
-                    {isUser && (
-                      target.avatar ? (
-                        <img src={target.avatar} alt="" className="w-8 h-8 rounded-full flex-shrink-0 mr-2 object-cover" />
-                      ) : (
-                        <div className="w-8 h-8 rounded-full bg-[#6b7280] flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mr-2">
-                          {displayName[0]}
-                        </div>
-                      )
-                    )}
-                    <div className="max-w-[75%]">
-                      <div
-                        className={`rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
-                          isUser
-                            ? "bg-[var(--color-bg-elevated)] text-[var(--color-text-primary)] border border-[var(--color-border-secondary)] rounded-bl-sm"
-                            : "bg-[#16a34a] text-white rounded-br-sm"
-                        }`}
-                      >
-                        {msgSearch ? highlightText(text, msgSearch) : text}
-                      </div>
-                      <div className={`text-[10px] text-[var(--color-text-tertiary)] mt-1 ${isUser ? "ml-1" : "text-right mr-1"}`}>
-                        {isUser ? displayName : "AI助手"} · {msg.createdAt}
-                      </div>
-                    </div>
-                    {!isUser && (
-                      <div className="w-8 h-8 rounded-full bg-[#16a34a] flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ml-2">
-                        AI
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </>
-      )}
-    </Drawer>
-  );
-}
-
 // ── Main Page ─────────────────────────────────────────────────────
 
 export default function UsersPage() {
   const { companyId, channel, timeRange, customDateRange } = useApp();
+  const router = useRouter();
   const isKefuMode = channel === "wecom_kefu";
 
   const [searchText, setSearchText] = useState("");
   const [users, setUsers] = useState<OrgUser[]>([]);
   const [customers, setCustomers] = useState<KefuCustomer[]>([]);
   const [loading, setLoading] = useState(false);
-  const [chatTarget, setChatTarget] = useState<ChatTarget | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [exportMode, setExportMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [exporting, setExporting] = useState(false);
@@ -255,11 +69,6 @@ export default function UsersPage() {
         .finally(() => setLoading(false));
     }
   }, [companyId, isKefuMode]);
-
-  const openChat = useCallback((target: ChatTarget) => {
-    setChatTarget(target);
-    setDrawerOpen(true);
-  }, []);
 
   // ── Kefu customer columns ──────────────────────────────────────
 
@@ -348,13 +157,9 @@ export default function UsersPage() {
           type="link"
           size="small"
           icon={<MessageOutlined />}
-          onClick={() => openChat({
-            externalUserId: record.externalUserId,
-            name: record.nickname || "客户",
-            avatar: record.avatar,
-          })}
+          onClick={() => router.push(`/dashboard/users/${record.externalUserId}?mode=kefu`)}
         >
-          聊天记录
+          查看详情
         </Button>
       ),
     },
@@ -362,17 +167,12 @@ export default function UsersPage() {
 
   // ── Org user columns ───────────────────────────────────────────
 
-  function getKefuBinding(user: OrgUser) {
-    return user.channelBindings?.find((b) => b.platform === "wecom_kefu") || null;
-  }
-
   const orgColumns: ColumnsType<OrgUser> = [
     {
       title: "用户",
       key: "name",
       width: 140,
       render: (_: unknown, record: OrgUser) => {
-        const hasKefu = !!getKefuBinding(record);
         return (
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-full bg-[#6b7280] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
@@ -386,11 +186,6 @@ export default function UsersPage() {
                 @{record.username}
               </div>
             </div>
-            {hasKefu && (
-              <Tag color="green" style={{ fontSize: 10, lineHeight: "16px", padding: "0 4px", margin: 0 }}>
-                已绑定
-              </Tag>
-            )}
           </div>
         );
       },
@@ -417,24 +212,16 @@ export default function UsersPage() {
       title: "操作",
       width: 100,
       fixed: "right",
-      render: (_: unknown, record: OrgUser) => {
-        const binding = getKefuBinding(record);
-        return binding ? (
-          <Button
-            type="link"
-            size="small"
-            icon={<MessageOutlined />}
-            onClick={() => openChat({
-              externalUserId: binding.platformUserId,
-              name: record.name || "客户",
-            })}
-          >
-            聊天记录
-          </Button>
-        ) : (
-          <span className="text-xs text-[var(--color-text-tertiary)]">未绑定</span>
-        );
-      },
+      render: (_: unknown, record: OrgUser) => (
+        <Button
+          type="link"
+          size="small"
+          icon={<MessageOutlined />}
+          onClick={() => router.push(`/dashboard/users/${record.id}?mode=org`)}
+        >
+          查看详情
+        </Button>
+      ),
     },
   ];
 
@@ -581,12 +368,6 @@ export default function UsersPage() {
           />
         )}
       </div>
-
-      <ChatDrawer
-        target={chatTarget}
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-      />
     </div>
   );
 }
