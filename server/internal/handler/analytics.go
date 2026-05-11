@@ -478,3 +478,86 @@ func msgTimeDistribution(startMs, endMs int64, scopeType string) []model.HourBuc
 	}
 	return result
 }
+
+func getUserStats(c *gin.Context) {
+	userID := c.Query("user_id")
+	mode := c.Query("mode")
+	if userID == "" || mode == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id and mode are required"})
+		return
+	}
+
+	start, end, err := resolveTimeRange(
+		c.DefaultQuery("time_range", "yesterday"),
+		c.Query("start_date"),
+		c.Query("end_date"),
+	)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var resp model.UserStatsResponse
+
+	if mode == "kefu" {
+		resp = kefuUserStats(userID, start, end)
+	} else {
+		resp = orgUserStats(userID, start, end)
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+func kefuUserStats(externalUserID string, start, end time.Time) model.UserStatsResponse {
+	var resp model.UserStatsResponse
+	repository.DB.QueryRow(`
+		SELECT COUNT(*)::int, COALESCE(SUM(LENGTH(content::text)), 0)::int / 2
+		FROM wecom_kefu_messages
+		WHERE external_userid = $1 AND created_at >= $2 AND created_at < $3
+	`, externalUserID, start, end).Scan(&resp.ConversationCount, &resp.TokenUsage)
+	return resp
+}
+
+func orgUserStats(mongoUserID string, start, end time.Time) model.UserStatsResponse {
+	var resp model.UserStatsResponse
+
+	objID, err := bson.ObjectIDFromHex(mongoUserID)
+	if err != nil {
+		return resp
+	}
+
+	var user model.UserDoc
+	if err := repository.UsersColl().FindOne(
+		context.Background(),
+		bson.M{"_id": objID},
+	).Decode(&user); err != nil {
+		return resp
+	}
+
+	var kefuID string
+	var wecomID string
+	for _, b := range user.ChannelBindings {
+		if b.Platform == "wecom_kefu" {
+			kefuID = b.PlatformUserID
+		}
+		if b.Platform == "wecom" {
+			wecomID = b.PlatformUserID
+		}
+	}
+
+	if kefuID != "" {
+		return kefuUserStats(kefuID, start, end)
+	}
+
+	if wecomID != "" {
+		startMs := start.UnixMilli()
+		endMs := end.UnixMilli()
+		repository.DB.QueryRow(`
+			SELECT COUNT(*)::int, COALESCE(SUM(LENGTH(content)), 0)::int / 2
+			FROM wecom_messages
+			WHERE sender_id = $1 AND create_time >= $2 AND create_time < $3
+		`, wecomID, startMs, endMs).Scan(&resp.ConversationCount, &resp.TokenUsage)
+	}
+
+	return resp
+}
