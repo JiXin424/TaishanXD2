@@ -27,6 +27,8 @@ func RegisterRoutes(r *gin.Engine, sessionKey string) {
 	r.POST("/api/auth/login", login(sessionKey))
 	r.POST("/api/auth/logout", logout)
 	r.GET("/api/analytics/usage", getAnalytics)
+	r.GET("/api/analytics/user-stats", getUserStats)
+	r.GET("/api/analytics/user-sessions", getUserSessions)
 	RegisterAnalysisProxyRoutes(r)
 
 	auth := r.Group("/api")
