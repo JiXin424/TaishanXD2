@@ -537,7 +537,19 @@ func listKefuMessages(c *gin.Context) {
 // @Success      200  {array}  model.KefuCustomer
 // @Router       /api/wecom/kefu-customers [get]
 func listKefuCustomers(c *gin.Context) {
-	query := `
+	timeCond := ""
+	timeRange := c.Query("time_range")
+	var timeArgs []interface{}
+
+	if timeRange != "" {
+		start, end, err := resolveTimeRange(timeRange, c.Query("start_date"), c.Query("end_date"))
+		if err == nil {
+			timeCond = " AND created_at >= $1 AND created_at < $2"
+			timeArgs = []interface{}{start, end}
+		}
+	}
+
+	query := fmt.Sprintf(`
 		SELECT c.external_userid,
 		       COALESCE(c.nickname, ''),
 		       COALESCE(c.avatar, ''),
@@ -546,15 +558,15 @@ func listKefuCustomers(c *gin.Context) {
 		       COALESCE(r.recv_count, 0),
 		       COALESCE(to_char(m.last_active, 'YYYY-MM-DD HH24:MI:SS'), '')
 		FROM wecom_kefu_customers c
-		LEFT JOIN (SELECT external_userid, COUNT(*) as sent_count FROM wecom_kefu_messages WHERE direction = 'sent' AND external_userid != '' GROUP BY external_userid) s
+		LEFT JOIN (SELECT external_userid, COUNT(*) as sent_count FROM wecom_kefu_messages WHERE direction = 'sent' AND external_userid != ''%s GROUP BY external_userid) s
 		  ON c.external_userid = s.external_userid
-		LEFT JOIN (SELECT external_userid, COUNT(*) as recv_count FROM wecom_kefu_messages WHERE direction = 'received' AND external_userid != '' GROUP BY external_userid) r
+		LEFT JOIN (SELECT external_userid, COUNT(*) as recv_count FROM wecom_kefu_messages WHERE direction = 'received' AND external_userid != ''%s GROUP BY external_userid) r
 		  ON c.external_userid = r.external_userid
-		LEFT JOIN (SELECT external_userid, MAX(created_at) as last_active FROM wecom_kefu_messages WHERE external_userid != '' GROUP BY external_userid) m
+		LEFT JOIN (SELECT external_userid, MAX(created_at) as last_active FROM wecom_kefu_messages WHERE external_userid != ''%s GROUP BY external_userid) m
 		  ON c.external_userid = m.external_userid
 		ORDER BY m.last_active DESC NULLS LAST
-	`
-	rows, err := repository.DB.Query(query)
+	`, timeCond, timeCond, timeCond)
+	rows, err := repository.DB.Query(query, timeArgs...)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

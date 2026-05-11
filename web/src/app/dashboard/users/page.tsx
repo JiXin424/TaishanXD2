@@ -58,7 +58,13 @@ export default function UsersPage() {
     if (!companyId) return;
     setLoading(true);
     if (isKefuMode) {
-      api<KefuCustomer[]>("/api/wecom/kefu-customers")
+      const qs = new URLSearchParams();
+      qs.set("time_range", timeRange);
+      if (timeRange === "custom" && customDateRange) {
+        qs.set("start_date", customDateRange[0]);
+        qs.set("end_date", customDateRange[1]);
+      }
+      api<KefuCustomer[]>(`/api/wecom/kefu-customers?${qs.toString()}`)
         .then(setCustomers)
         .catch(() => setCustomers([]))
         .finally(() => setLoading(false));
@@ -68,7 +74,7 @@ export default function UsersPage() {
         .catch(() => setUsers([]))
         .finally(() => setLoading(false));
     }
-  }, [companyId, isKefuMode]);
+  }, [companyId, isKefuMode, timeRange, customDateRange]);
 
   // ── Kefu customer columns ──────────────────────────────────────
 
