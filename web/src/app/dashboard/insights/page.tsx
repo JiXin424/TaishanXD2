@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Button, Spin, Result, Table, Tag, Card, Empty, Alert } from "antd";
+import { useState, useEffect } from "react";
+import { Button, Spin, Table, Tag, Card, Empty, Alert, Collapse, CollapseProps } from "antd";
 import {
   ThunderboltOutlined,
   UserOutlined,
@@ -9,12 +9,17 @@ import {
   BulbOutlined,
   BarChartOutlined,
   ProfileOutlined,
+  CalendarOutlined,
+  DatabaseOutlined,
+  ClockCircleOutlined,
 } from "@ant-design/icons";
 import { useApp } from "@/lib/AppContext";
 import {
   fetchAnalysis,
+  fetchAnalysisHistory,
   type AnalysisReport,
   type AnalysisResponse,
+  type AnalysisHistoryItem,
 } from "@/lib/api";
 
 const TAG_COLORS: Record<string, string> = {
@@ -27,36 +32,62 @@ const TAG_COLORS: Record<string, string> = {
 
 export default function InsightsPage() {
   const { companyId, channel, timeRange } = useApp();
-  const [report, setReport] = useState<AnalysisReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [history, setHistory] = useState<AnalysisHistoryItem[]>([]);
+
+  const appId = channel === "wecom_kefu" ? "wecom_kefu" : channel;
+
+  useEffect(() => {
+    if (!companyId) return;
+    fetchAnalysisHistory(appId, companyId, 20).then(setHistory).catch(() => {});
+  }, [companyId, appId]);
 
   const handleAnalyze = async () => {
     if (!companyId) return;
     setLoading(true);
     setError(null);
-    setReport(null);
 
     try {
       const res: AnalysisResponse = await fetchAnalysis({
         company_id: companyId,
         channel,
-        app_id: channel === "wecom_kefu" ? "wecom_kefu" : channel,
+        app_id: appId,
         app_name: channel === "wecom_kefu" ? "微信客服" : undefined,
         time_range: timeRange,
       });
 
-      if (res.success && res.data) {
-        setReport(res.data);
-      } else {
+      if (!res.success) {
         setError(res.error || "分析失败，请重试");
       }
+      fetchAnalysisHistory(appId, companyId, 20).then(setHistory).catch(() => {});
     } catch {
       setError("网络错误，分析服务不可达");
     } finally {
       setLoading(false);
     }
   };
+
+  const collapseItems: CollapseProps["items"] = history.map((item) => ({
+    key: item.id,
+    label: (
+      <div style={{ display: "flex", alignItems: "center", gap: 24, flexWrap: "wrap" }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <CalendarOutlined style={{ color: "var(--color-primary-500)" }} />
+          {item.coverage_display || "全部时间"}
+        </span>
+        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <DatabaseOutlined style={{ color: "var(--color-primary-500)" }} />
+          {item.data_count} 条对话
+        </span>
+        <span style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--color-text-tertiary)", fontSize: 13 }}>
+          <ClockCircleOutlined />
+          {new Date(item.created_at).toLocaleString("zh-CN")}
+        </span>
+      </div>
+    ),
+    children: item.report ? <ReportView report={item.report as AnalysisReport} /> : <Empty description="报告数据不可用" />,
+  }));
 
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto" }}>
@@ -126,15 +157,16 @@ export default function InsightsPage() {
         </div>
       )}
 
-      {/* Empty state */}
-      {!loading && !report && !error && (
-        <div className="unified-card" style={{ textAlign: "center", padding: "80px 24px" }}>
-          <Empty description="选择公司和时间范围后，点击「生成分析报告」" />
-        </div>
+      {/* History */}
+      {!loading && history.length > 0 && (
+        <Collapse items={collapseItems} defaultActiveKey={history.length > 0 ? [history[0].id] : []} />
       )}
 
-      {/* Report */}
-      {!loading && report && <ReportView report={report} />}
+      {!loading && history.length === 0 && (
+        <div className="unified-card" style={{ textAlign: "center", padding: "80px 24px" }}>
+          <Empty description="暂无分析记录，点击「生成分析报告」开始" />
+        </div>
+      )}
     </div>
   );
 }

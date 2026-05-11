@@ -56,12 +56,8 @@ TaishanXD2/
 │   │   │       ├── layout.tsx               # Dashboard 共享布局（侧边栏 + Header）
 │   │   │       ├── page.tsx                 # 重定向到 /dashboard/overview
 │   │   │       ├── overview/page.tsx        # 系统概览（健康检查、系统信息）
-│   │   │       ├── users/
-│   │   │       │   ├── page.tsx             # 用户明细（表格 + 搜索 + 导航到详情页）
-│   │   │       │   └── [id]/
-│   │   │       │       └── page.tsx         # 用户详情（双栏：统计+会话列表+聊天记录）
-│   │   │       ├── analytics/page.tsx       # 使用分析（统计卡片 + 图表占位）
-│   │   │       └── insights/page.tsx        # 分析总览（LLM 六段式报告 + 历史记录）
+│   │   │       ├── users/page.tsx           # 用户明细（表格 + 搜索 + 聊天记录 Drawer）
+│   │   │       └── analytics/page.tsx       # 使用分析（统计卡片 + 图表占位）
 │   │   ├── lib/api.ts               # HTTP 客户端封装 + TypeScript 类型定义
 │   │   ├── lib/AppContext.tsx        # 全局状态 Context（当前公司 ID + 渠道选择）
 │   │   └── lib/mockData.ts          # 钉钉/飞书 mock 数据（用户列表 + 统计数据）
@@ -163,8 +159,6 @@ cd server && go run cmd/server/main.go  # http://localhost:4007
 | GET    | `/api/analytics/usage`                     | 否 | 使用分析聚合数据（按渠道/时间/聊天类型筛选，返回 4 组图表数据） |
 | POST   | `/api/analysis/analyze`                    | 否 | 触发 LLM 分析（Go 代理→查消息→转发 Python 服务→返回六段式报告） |
 | GET    | `/api/analysis/history`                    | 否 | 查询分析历史记录（参数：app_id, company_id, limit） |
-| GET    | `/api/analytics/user-stats`              | 否 | 单用户统计数据（会话数、Token消耗）|
-| GET    | `/api/analytics/user-sessions`            | 否 | 用户会话分组列表（按30分钟间隔分割）|
 
 ### 认证流程
 
@@ -190,7 +184,6 @@ cd server && go run cmd/server/main.go  # http://localhost:4007
   - `{platform: "wecom", platformUserId: "GuoTongJia"}` — 企微内部员工 ID
   - `{platform: "wecom_kefu", platformUserId: "wmpQbHEA..."}` — 企微客服外部用户 ID（用于查聊天记录）
 - `positions` — 用户职位（userId, orgNodeId, orgNodePath, title, isLeader），orgNodePath 冗余存储以加速管辖范围查询，支持多重身份
-- `analysis_logs` — LLM 分析报告日志（appId, companyId, report, summary, success, createdAt），Go 后端异步写入
 
 MongoDB 用户与 PostgreSQL 渠道用户关系：`users.channelBindings` 中的 `platform + platformUserId` 对应 PostgreSQL 的 `wecom_users.user_id` 等字段。
 
@@ -220,10 +213,10 @@ MongoDB 用户与 PostgreSQL 渠道用户关系：`users.channelBindings` 中的
 
 ### 文档同步规范
 
-- 每次新增或修改功能后，必须同步更新 `CLAUDE.md` 和 `README.md` 中对应的内容
+- 每次新增或修改功能后，必须同步更新 `AGENTS.md` 和 `README.md` 中对应的内容
 - 具体包括但不限于：
-  - 新增 API 路由 → 更新 CLAUDE.md 的 API 路由表
-  - 新增/修改数据库表 → 更新 CLAUDE.md 的数据库设计部分 + 目录结构
-  - 新增页面或前端模块 → 更新 CLAUDE.md 的前端架构和目录结构
+  - 新增 API 路由 → 更新 AGENTS.md 的 API 路由表
+  - 新增/修改数据库表 → 更新 AGENTS.md 的数据库设计部分 + 目录结构
+  - 新增页面或前端模块 → 更新 AGENTS.md 的前端架构和目录结构
   - 新增依赖或技术栈变更 → 更新技术栈表格
   - 项目结构变化 → 同步更新 README.md 的项目结构

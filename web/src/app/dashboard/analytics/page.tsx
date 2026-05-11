@@ -109,12 +109,12 @@ export default function AnalyticsPage() {
             <UserTokenChart data={data.userTokens} />
           </ChartCard>
         </Col>
-        <Col xs={24} lg={12}>
+        <Col xs={24}>
           <ChartCard title="对话量趋势" delay="160ms">
             <VolumeChart data={data.conversationVolume} />
           </ChartCard>
         </Col>
-        <Col xs={24} lg={12}>
+        <Col xs={24}>
           <ChartCard title="时段分布" delay="240ms">
             <TimeDistChart data={data.timeDistribution} />
           </ChartCard>

@@ -2,13 +2,19 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
+
+	"github.com/taishanxd/v2/internal/model"
 	"github.com/taishanxd/v2/internal/repository"
 )
 
@@ -48,6 +54,39 @@ type llmAnalyzeRequest struct {
 	CoverageDisplay string         `json:"coverage_display"`
 }
 
+// llmAnalyzeResponse matches the Python AnalyzeResponse model.
+type llmAnalyzeResponse struct {
+	Success     bool        `json:"success"`
+	Data        interface{} `json:"data"`
+	Error       *string     `json:"error"`
+	AnalysisID  *int        `json:"analysis_id"`
+}
+
+// checkAnalysisCache looks for a recent successful analysis in MongoDB.
+// Cache is valid for 30 minutes to avoid redundant LLM calls.
+const analysisCacheTTL = 7 * 24 * time.Hour
+
+func checkAnalysisCache(appID, companyID, timeRange string) *model.AnalysisLogDoc {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	cutoff := time.Now().Add(-analysisCacheTTL)
+	filter := bson.M{
+		"appId":     appID,
+		"companyId": companyID,
+		"timeRange": timeRange,
+		"success":   true,
+		"createdAt": bson.M{"$gte": cutoff},
+	}
+
+	var doc model.AnalysisLogDoc
+	err := repository.AnalysisLogsColl().FindOne(ctx, filter).Decode(&doc)
+	if err != nil {
+		return nil
+	}
+	return &doc
+}
+
 func RegisterAnalysisProxyRoutes(r *gin.Engine) {
 	r.POST("/api/analysis/analyze", handleAnalyze)
 	r.GET("/api/analysis/history", handleAnalysisHistory)
@@ -78,12 +117,29 @@ func handleAnalyze(c *gin.Context) {
 		coverageStr = "全部数据"
 	}
 
+	// Check cache: if a successful report exists for the same app+company+timeRange, return it directly
+	cached := checkAnalysisCache(req.AppID, req.CompanyID, req.TimeRange)
+	if cached != nil {
+		log.Printf("[analysis] 命中缓存: app=%s company=%s timeRange=%s id=%s", req.AppID, req.CompanyID, req.TimeRange, cached.ID.Hex())
+		c.JSON(http.StatusOK, gin.H{
+			"success":     true,
+			"data":        cached.Report,
+			"error":       nil,
+			"analysis_id": cached.ID.Hex(),
+			"cached":      true,
+		})
+		return
+	}
+
 	// Query messages from PostgreSQL based on channel config
 	dataList, pgID, err := fetchDialogueData(req.CompanyID, req.Channel, cfg, timeErr, startTime, endTime)
 	if err != nil {
+		log.Printf("[analysis] 查询数据失败: company=%s channel=%s timeRange=%s err=%v", req.CompanyID, req.Channel, req.TimeRange, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("查询数据失败: %v", err)})
 		return
 	}
+
+	log.Printf("[analysis] 查询到 %d 条对话数据 company=%s channel=%s timeRange=%s pgID=%d", len(dataList), req.CompanyID, req.Channel, req.TimeRange, pgID)
 
 	if len(dataList) == 0 {
 		c.JSON(http.StatusOK, gin.H{
@@ -125,13 +181,19 @@ func handleAnalyze(c *gin.Context) {
 		return
 	}
 
+	log.Printf("[analysis] 转发到 Python 服务: url=%s bodySize=%d bytes", llmAnalysisURL+"/api/v1/analyze", len(body))
+
 	// Forward to Python service
-	resp, err := http.Post(llmAnalysisURL+"/api/v1/analyze", "application/json", bytes.NewReader(body))
+	httpClient := &http.Client{Timeout: 600 * time.Second}
+	resp, err := httpClient.Post(llmAnalysisURL+"/api/v1/analyze", "application/json", bytes.NewReader(body))
 	if err != nil {
+		log.Printf("[analysis] Python 服务请求失败: %v", err)
 		c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("分析服务不可达: %v", err)})
 		return
 	}
 	defer resp.Body.Close()
+
+	log.Printf("[analysis] Python 服务响应: status=%d", resp.StatusCode)
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -139,31 +201,150 @@ func handleAnalyze(c *gin.Context) {
 		return
 	}
 
+	// Save to MongoDB
+	var llmResp llmAnalyzeResponse
+	if jsonErr := json.Unmarshal(respBody, &llmResp); jsonErr == nil {
+		go saveAnalysisLog(req, llmResp, coverageStr)
+	}
+
 	c.Data(resp.StatusCode, "application/json", respBody)
+}
+
+// saveAnalysisLog persists the analysis result to MongoDB (async).
+func saveAnalysisLog(req AnalysisProxyRequest, llmResp llmAnalyzeResponse, coverageDisplay string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Extract summary info from report data
+	var summary string
+	var coreIntents []string
+	var qualityIssues []string
+
+	if reportMap, ok := llmResp.Data.(map[string]interface{}); ok {
+		if cats, ok := reportMap["categories"].([]interface{}); ok {
+			for _, c := range cats {
+				if cm, ok := c.(map[string]interface{}); ok {
+					if name, ok := cm["name"].(string); ok {
+						coreIntents = append(coreIntents, name)
+					}
+				}
+			}
+		}
+		if patterns, ok := reportMap["common_patterns"].([]interface{}); ok {
+			for _, p := range patterns {
+				if pm, ok := p.(map[string]interface{}); ok {
+					if title, ok := pm["title"].(string); ok {
+						qualityIssues = append(qualityIssues, title)
+					}
+				}
+			}
+		}
+		if spotlight, ok := reportMap["spotlight"].(map[string]interface{}); ok {
+			if title, ok := spotlight["title"].(string); ok {
+				summary = title
+			}
+		}
+		if insights, ok := reportMap["key_insights"].([]interface{}); ok && len(insights) > 0 {
+			parts := []string{}
+			if summary != "" {
+				parts = append(parts, summary)
+			}
+			for i := 0; i < 3 && i < len(insights); i++ {
+				if im, ok := insights[i].(map[string]interface{}); ok {
+					if title, ok := im["title"].(string); ok {
+						parts = append(parts, title)
+					}
+				}
+			}
+			summary = ""
+			for i, p := range parts {
+				if i > 0 {
+					summary += "；"
+				}
+				summary += p
+			}
+		}
+	}
+
+	errMsg := ""
+	if llmResp.Error != nil {
+		errMsg = *llmResp.Error
+	}
+
+	doc := model.AnalysisLogDoc{
+		ID:              bson.NewObjectID(),
+		AppID:           req.AppID,
+		CompanyID:       req.CompanyID,
+		AnalysisTarget:  fmt.Sprintf("分析%s的AI工具使用情况", req.AppName),
+		DataCount:       0, // will be filled from report header
+		CoverageDisplay: coverageDisplay,
+		TimeRange:       req.TimeRange,
+		Success:         llmResp.Success,
+		ErrorMsg:        errMsg,
+		Summary:         summary,
+		CoreIntents:     coreIntents,
+		QualityIssues:   qualityIssues,
+		Report:          llmResp.Data,
+		CreatedAt:       time.Now(),
+	}
+
+	// Get data_count from report header
+	if reportMap, ok := llmResp.Data.(map[string]interface{}); ok {
+		if header, ok := reportMap["header"].(map[string]interface{}); ok {
+			if tc, ok := header["total_conversations"].(float64); ok {
+				doc.DataCount = int(tc)
+			}
+		}
+	}
+
+	_, err := repository.AnalysisLogsColl().InsertOne(ctx, doc)
+	if err != nil {
+		log.Printf("[analysis] 保存分析日志到 MongoDB 失败: %v", err)
+	} else {
+		log.Printf("[analysis] 分析日志已保存到 MongoDB: id=%s company=%s", doc.ID.Hex(), req.CompanyID)
+	}
 }
 
 func handleAnalysisHistory(c *gin.Context) {
 	appID := c.Query("app_id")
 	companyID := c.Query("company_id")
-	limit := c.DefaultQuery("limit", "20")
+	limit := 20
 
-	url := fmt.Sprintf("%s/api/v1/analysis/history?app_id=%s&company_id=%s&limit=%s",
-		llmAnalysisURL, appID, companyID, limit)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-	resp, err := http.Get(url)
-	if err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": "分析服务不可达"})
-		return
+	filter := bson.M{"success": true}
+	if appID != "" {
+		filter["appId"] = appID
 	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "读取历史记录失败"})
-		return
+	if companyID != "" {
+		filter["companyId"] = companyID
 	}
 
-	c.Data(resp.StatusCode, "application/json", respBody)
+	opts := options.Find().
+		SetSort(bson.D{{Key: "createdAt", Value: -1}}).
+		SetLimit(int64(limit))
+
+	cursor, err := repository.AnalysisLogsColl().Find(ctx, filter, opts)
+	if err != nil {
+		log.Printf("[analysis] 查询历史失败: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询历史记录失败"})
+		return
+	}
+	defer cursor.Close(ctx)
+
+	var results []model.AnalysisLogDoc
+	if err := cursor.All(ctx, &results); err != nil {
+		log.Printf("[analysis] 解析历史记录失败: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "解析历史记录失败"})
+		return
+	}
+
+	if results == nil {
+		results = []model.AnalysisLogDoc{}
+	}
+
+	c.JSON(http.StatusOK, results)
 }
 
 // fetchDialogueData queries the appropriate messages table and returns dialogue items.
@@ -181,16 +362,22 @@ func fetchDialogueData(mongoCompanyID, channel string, cfg channelTableConfig, t
 		args = append(args, pgID)
 	}
 
+	// Use table alias prefix for JOIN queries to avoid ambiguous column references
+	tableAlias := ""
+	if channel == "wecom_kefu" {
+		tableAlias = "m."
+	}
+
 	if timeErr == nil {
 		argIdx++
-		conds = append(conds, fmt.Sprintf("%s >= $%d", cfg.TimeColumn, argIdx))
+		conds = append(conds, fmt.Sprintf("%s%s >= $%d", tableAlias, cfg.TimeColumn, argIdx))
 		if cfg.TimeIsTimestamp {
 			args = append(args, startTime)
 		} else {
 			args = append(args, startTime.UnixMilli())
 		}
 		argIdx++
-		conds = append(conds, fmt.Sprintf("%s < $%d", cfg.TimeColumn, argIdx))
+		conds = append(conds, fmt.Sprintf("%s%s < $%d", tableAlias, cfg.TimeColumn, argIdx))
 		if cfg.TimeIsTimestamp {
 			args = append(args, endTime)
 		} else {
@@ -247,6 +434,9 @@ func fetchKefuDialogue(where string, args []interface{}, pgID int) ([]dialogueIt
 		var uid, name, content, dir string
 		var t time.Time
 		if err := rows.Scan(&uid, &name, &content, &dir, &t); err != nil {
+			continue
+		}
+		if uid == "" {
 			continue
 		}
 		msgs = append(msgs, userMsg{uid, name, content, dir, t})

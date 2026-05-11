@@ -137,3 +137,22 @@ type UpdatePositionReq struct {
 	IsLeader *bool   `json:"isLeader"`
 	Status   *string `json:"status"`
 }
+
+// ── Analysis Logs ──────────────────────────────────────────────
+
+type AnalysisLogDoc struct {
+	ID              bson.ObjectID `bson:"_id"              json:"id"`
+	AppID           string             `bson:"appId"            json:"app_id"`
+	CompanyID       string             `bson:"companyId"        json:"company_id"`
+	AnalysisTarget  string             `bson:"analysisTarget"   json:"analysis_target"`
+	DataCount       int                `bson:"dataCount"        json:"data_count"`
+	CoverageDisplay string             `bson:"coverageDisplay"  json:"coverage_display"`
+	TimeRange       string             `bson:"timeRange"        json:"time_range"`
+	Success         bool               `bson:"success"          json:"success"`
+	ErrorMsg        string             `bson:"errorMsg"         json:"error_msg,omitempty"`
+	Summary         string             `bson:"summary"          json:"summary"`
+	CoreIntents     []string           `bson:"coreIntents"      json:"core_intents"`
+	QualityIssues   []string           `bson:"qualityIssues"    json:"quality_issues"`
+	Report          interface{}        `bson:"report"           json:"report"`
+	CreatedAt       time.Time          `bson:"createdAt"        json:"created_at"`
+}

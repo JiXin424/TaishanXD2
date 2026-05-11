@@ -1,0 +1,242 @@
+<h2>用户详情页 — 布局方案</h2>
+<p class="subtitle">三种布局思路，考虑信息密度和阅读体验</p>
+
+<div class="cards">
+  <!-- Approach A -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#f8fafc; padding:16px; min-height:320px; font-size:12px;">
+        <!-- Top bar -->
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid #e2e8f0;">
+          <div style="color:#64748b;">← 返回用户明细</div>
+        </div>
+        <!-- Profile -->
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+          <div style="width:48px;height:48px;border-radius:50%;background:#3b82f6;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;">张</div>
+          <div>
+            <div style="font-weight:600;font-size:15px;">张三</div>
+            <div style="font-size:11px;color:#94a3b8;">@zhangsan · 已绑定客服</div>
+          </div>
+        </div>
+        <!-- Stats row -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px;">
+          <div style="background:#eff6ff;border-radius:8px;padding:10px;text-align:center;">
+            <div style="font-size:18px;font-weight:700;color:#3b82f6;">128</div>
+            <div style="font-size:10px;color:#64748b;">会话数</div>
+          </div>
+          <div style="background:#f0fdf4;border-radius:8px;padding:10px;text-align:center;">
+            <div style="font-size:18px;font-weight:700;color:#16a34a;">2,450</div>
+            <div style="font-size:10px;color:#64748b;">Token 消耗</div>
+          </div>
+          <div style="background:#fefce8;border-radius:8px;padding:10px;text-align:center;">
+            <div style="font-size:18px;font-weight:700;color:#eab308;">5</div>
+            <div style="font-size:10px;color:#64748b;">最近会话</div>
+          </div>
+        </div>
+        <!-- Recent conversations -->
+        <div style="font-weight:600;font-size:13px;margin-bottom:8px;">最近会话</div>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;">
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:8px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+              <span style="font-weight:500;font-size:11px;">如何使用 Dify 工作流？</span>
+              <span style="font-size:10px;color:#94a3b8;">14:32</span>
+            </div>
+            <div style="font-size:10px;color:#64748b;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">Dify 工作流是一种可视化的自动化流程编排工具...</div>
+          </div>
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:8px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+              <span style="font-weight:500;font-size:11px;">API 接口调试问题</span>
+              <span style="font-size:10px;color:#94a3b8;">10:15</span>
+            </div>
+            <div style="font-size:10px;color:#64748b;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">关于接口返回 403 的问题，通常是因为权限配置...</div>
+          </div>
+        </div>
+        <!-- Full messages -->
+        <div style="font-weight:600;font-size:13px;margin-bottom:8px;">详细会话记录</div>
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:8px;">
+          <div style="display:flex;gap:6px;margin-bottom:6px;">
+            <div style="width:20px;height:20px;border-radius:50%;background:#6b7280;color:#fff;font-size:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">张</div>
+            <div style="background:#f1f5f9;border-radius:8px;padding:4px 8px;font-size:10px;max-width:80%;">如何配置 Dify？</div>
+          </div>
+          <div style="display:flex;gap:6px;justify-content:flex-end;margin-bottom:6px;">
+            <div style="background:#16a34a;color:#fff;border-radius:8px;padding:4px 8px;font-size:10px;max-width:80%;">Dify 配置步骤如下...</div>
+            <div style="width:20px;height:20px;border-radius:50%;background:#16a34a;color:#fff;font-size:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">AI</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. 单列滚动式</h3>
+      <p>所有内容纵向排列，从上到下滚动浏览。简单直观，适合移动端适配。</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>优点</h4><ul><li>结构清晰，实现简单</li><li>自然滚动浏览</li><li>移动端友好</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>信息密度较低</li><li>聊天记录需要大量滚动</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Approach B -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#f8fafc; padding:16px; min-height:320px; font-size:12px;">
+        <!-- Two columns -->
+        <div style="display:flex;gap:12px;height:300px;">
+          <!-- Left column -->
+          <div style="width:35%;display:flex;flex-direction:column;gap:10px;flex-shrink:0;">
+            <!-- Back button -->
+            <div style="color:#64748b;font-size:11px;padding-bottom:8px;border-bottom:1px solid #e2e8f0;">← 返回</div>
+            <!-- Profile -->
+            <div style="text-align:center;padding:8px 0;">
+              <div style="width:56px;height:56px;border-radius:50%;background:#3b82f6;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:22px;">张</div>
+              <div style="font-weight:600;font-size:14px;margin-top:6px;">张三</div>
+              <div style="font-size:10px;color:#94a3b8;">@zhangsan</div>
+            </div>
+            <!-- Stats -->
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <div style="background:#eff6ff;border-radius:8px;padding:8px;display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-size:10px;color:#64748b;">会话数</span>
+                <span style="font-weight:700;color:#3b82f6;font-size:16px;">128</span>
+              </div>
+              <div style="background:#f0fdf4;border-radius:8px;padding:8px;display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-size:10px;color:#64748b;">Token 消耗</span>
+                <span style="font-weight:700;color:#16a34a;font-size:16px;">2,450</span>
+              </div>
+            </div>
+            <!-- Recent conversations -->
+            <div style="font-weight:600;font-size:11px;margin-top:4px;">最近会话</div>
+            <div style="display:flex;flex-direction:column;gap:4px;overflow-y:auto;flex:1;">
+              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:6px;cursor:pointer;border-left:3px solid #3b82f6;">
+                <div style="font-weight:500;font-size:10px;margin-bottom:2px;">如何使用 Dify 工作流？</div>
+                <div style="font-size:9px;color:#94a3b8;">14:32 · 8条消息</div>
+              </div>
+              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:6px;cursor:pointer;">
+                <div style="font-weight:500;font-size:10px;margin-bottom:2px;">API 接口调试问题</div>
+                <div style="font-size:9px;color:#94a3b8;">10:15 · 5条消息</div>
+              </div>
+              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:6px;cursor:pointer;">
+                <div style="font-weight:500;font-size:10px;margin-bottom:2px;">数据导出功能咨询</div>
+                <div style="font-size:9px;color:#94a3b8;">昨天 · 3条消息</div>
+              </div>
+            </div>
+          </div>
+          <!-- Right column - chat -->
+          <div style="flex:1;display:flex;flex-direction:column;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;background:#fff;">
+            <div style="padding:8px 12px;border-bottom:1px solid #e2e8f0;font-weight:600;font-size:12px;display:flex;justify-content:space-between;align-items:center;">
+              <span>详细会话记录</span>
+              <span style="font-weight:400;font-size:10px;color:#94a3b8;">共 42 条消息</span>
+            </div>
+            <div style="flex:1;padding:10px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;">
+              <div style="display:flex;gap:6px;">
+                <div style="width:20px;height:20px;border-radius:50%;background:#6b7280;color:#fff;font-size:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">张</div>
+                <div style="background:#f1f5f9;border-radius:8px;padding:4px 8px;font-size:10px;max-width:80%;">如何配置 Dify？</div>
+              </div>
+              <div style="display:flex;gap:6px;justify-content:flex-end;">
+                <div style="background:#16a34a;color:#fff;border-radius:8px;padding:4px 8px;font-size:10px;max-width:80%;">Dify 配置步骤如下...</div>
+                <div style="width:20px;height:20px;border-radius:50%;background:#16a34a;color:#fff;font-size:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">AI</div>
+              </div>
+              <div style="display:flex;gap:6px;">
+                <div style="width:20px;height:20px;border-radius:50%;background:#6b7280;color:#fff;font-size:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">张</div>
+                <div style="background:#f1f5f9;border-radius:8px;padding:4px 8px;font-size:10px;max-width:80%;">工作流节点怎么连？</div>
+              </div>
+              <div style="display:flex;gap:6px;justify-content:flex-end;">
+                <div style="background:#16a34a;color:#fff;border-radius:8px;padding:4px 8px;font-size:10px;max-width:80%;">节点连接方式...</div>
+                <div style="width:20px;height:20px;border-radius:50%;background:#16a34a;color:#fff;font-size:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">AI</div>
+              </div>
+            </div>
+            <div style="padding:6px 10px;border-top:1px solid #e2e8f0;">
+              <div style="display:flex;gap:6px;">
+                <input style="flex:1;border:1px solid #e2e8f0;border-radius:6px;padding:4px 8px;font-size:10px;" placeholder="搜索聊天内容..." />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. 双栏布局</h3>
+      <p>左侧固定信息面板（头像、统计、最近会话），右侧完整聊天记录。信息密度高。</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>优点</h4><ul><li>信息密度高，一目了然</li><li>聊天记录始终可见</li><li>类似现代聊天应用的布局</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>移动端需要响应式折叠</li><li>实现稍复杂</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Approach C -->
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#f8fafc; padding:16px; min-height:320px; font-size:12px;">
+        <!-- Back + Profile -->
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid #e2e8f0;">
+          <div style="color:#64748b;font-size:11px;">← 返回</div>
+        </div>
+        <!-- Profile + Stats inline -->
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+          <div style="width:48px;height:48px;border-radius:50%;background:#3b82f6;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;flex-shrink:0;">张</div>
+          <div style="flex:1;">
+            <div style="font-weight:600;font-size:15px;">张三</div>
+            <div style="font-size:10px;color:#94a3b8;">@zhangsan · 已绑定客服</div>
+          </div>
+          <div style="display:flex;gap:12px;">
+            <div style="text-align:center;">
+              <div style="font-size:16px;font-weight:700;color:#3b82f6;">128</div>
+              <div style="font-size:9px;color:#64748b;">会话数</div>
+            </div>
+            <div style="text-align:center;">
+              <div style="font-size:16px;font-weight:700;color:#16a34a;">2,450</div>
+              <div style="font-size:9px;color:#64748b;">Token</div>
+            </div>
+          </div>
+        </div>
+        <!-- Tabs -->
+        <div style="display:flex;border-bottom:2px solid #e2e8f0;margin-bottom:12px;">
+          <div style="padding:6px 14px;font-size:12px;font-weight:600;border-bottom:2px solid #3b82f6;margin-bottom:-2px;color:#3b82f6;">最近会话</div>
+          <div style="padding:6px 14px;font-size:12px;color:#94a3b8;">全部会话记录</div>
+        </div>
+        <!-- Tab content: Recent -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:10px;">
+            <div style="font-weight:500;font-size:11px;margin-bottom:4px;">如何使用 Dify 工作流？</div>
+            <div style="font-size:10px;color:#64748b;margin-bottom:6px;">Dify 工作流是一种可视化的自动化流程编排工具，可以帮助你快速构建...</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:9px;color:#94a3b8;">14:32</span>
+              <span style="background:#eff6ff;color:#3b82f6;font-size:9px;padding:1px 6px;border-radius:4px;">8条消息</span>
+            </div>
+          </div>
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:10px;">
+            <div style="font-weight:500;font-size:11px;margin-bottom:4px;">API 接口调试问题</div>
+            <div style="font-size:10px;color:#64748b;margin-bottom:6px;">关于接口返回 403 的问题，通常是因为权限配置不当导致...</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:9px;color:#94a3b8;">10:15</span>
+              <span style="background:#eff6ff;color:#3b82f6;font-size:9px;padding:1px 6px;border-radius:4px;">5条消息</span>
+            </div>
+          </div>
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:10px;">
+            <div style="font-weight:500;font-size:11px;margin-bottom:4px;">数据导出功能咨询</div>
+            <div style="font-size:10px;color:#64748b;margin-bottom:6px;">数据导出支持 CSV 和 Excel 格式，可以在设置页面...</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:9px;color:#94a3b8;">昨天</span>
+              <span style="background:#eff6ff;color:#3b82f6;font-size:9px;padding:1px 6px;border-radius:4px;">3条消息</span>
+            </div>
+          </div>
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:10px;">
+            <div style="font-weight:500;font-size:11px;margin-bottom:4px;">模型参数优化建议</div>
+            <div style="font-size:10px;color:#64748b;margin-bottom:6px;">根据你的使用场景，建议将 temperature 调整为 0.7...</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:9px;color:#94a3b8;">前天</span>
+              <span style="background:#eff6ff;color:#3b82f6;font-size:9px;padding:1px 6px;border-radius:4px;">6条消息</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C. Tab 分页式</h3>
+      <p>顶部用户信息 + 统计内联，下方 Tab 切换"最近会话"和"全部记录"。按需加载。</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>优点</h4><ul><li>页面干净，信息按需查看</li><li>顶部信息紧凑</li><li>最近会话可用卡片网格展示</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>需要切换 Tab 才看全部记录</li><li>上下文切换感</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>

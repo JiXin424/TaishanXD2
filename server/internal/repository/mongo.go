@@ -70,6 +70,10 @@ func PositionsColl() *mongo.Collection {
 	return MongoDB.Collection("positions")
 }
 
+func AnalysisLogsColl() *mongo.Collection {
+	return MongoDB.Collection("analysis_logs")
+}
+
 func CreateIndexes() error {
 	ctx := context.Background()
 
@@ -100,6 +104,10 @@ func CreateIndexes() error {
 		{PositionsColl(), "org_node", bson.D{{Key: "orgNodeId", Value: 1}}, false},
 		{PositionsColl(), "company_path", bson.D{{Key: "companyId", Value: 1}, {Key: "orgNodePath", Value: 1}}, false},
 		{PositionsColl(), "path_prefix", bson.D{{Key: "orgNodePath", Value: 1}}, false},
+
+		// Analysis Logs
+		{AnalysisLogsColl(), "app_company", bson.D{{Key: "appId", Value: 1}, {Key: "companyId", Value: 1}}, false},
+		{AnalysisLogsColl(), "created_at", bson.D{{Key: "createdAt", Value: -1}}, false},
 	}
 
 	for _, ix := range indexes {

@@ -1,5 +1,5 @@
 // 001_create_indexes.js
-// MongoDB 索引初始化 — 2026-05-07
+// MongoDB 索引初始化 — 2026-05-11
 // 对应 Go 代码: server/internal/repository/mongo.go → CreateIndexes()
 
 // ── Companies ──────────────────────────────────────────────────
@@ -56,4 +56,14 @@ db.positions.createIndex(
 db.positions.createIndex(
   { orgNodePath: 1 },
   { name: "path_prefix" }
+);
+
+// ── Analysis Logs ─────────────────────────────────────────────
+db.analysis_logs.createIndex(
+  { appId: 1, companyId: 1 },
+  { name: "app_company" }
+);
+db.analysis_logs.createIndex(
+  { createdAt: -1 },
+  { name: "created_at" }
 );

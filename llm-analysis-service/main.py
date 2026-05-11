@@ -6,6 +6,7 @@ main.py - FastAPI 服务入口
 
 import logging
 import os
+import time
 
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -71,14 +72,25 @@ async def analyze_endpoint(request: AnalysisRequest) -> AnalyzeResponse:
     4. 持久化到数据库
     5. 返回完整报告 JSON
     """
-    report, success, error_msg, record_id = analyze(request)
-
-    return AnalyzeResponse(
-        success=success,
-        data=report,
-        error=error_msg,
-        analysis_id=record_id,
-    )
+    logger.info("收到分析请求: app_id=%s company_id=%s data_count=%d time_range=%s analysis_target=%s",
+                request.app_id, request.company_id, len(request.data_list),
+                request.time_range, request.analysis_target[:80])
+    t0 = time.time()
+    try:
+        report, success, error_msg, record_id = analyze(request)
+        elapsed = time.time() - t0
+        logger.info("分析完成: success=%s record_id=%s elapsed=%.1fs error=%s",
+                    success, record_id, elapsed, error_msg)
+        return AnalyzeResponse(
+            success=success,
+            data=report,
+            error=error_msg,
+            analysis_id=record_id,
+        )
+    except Exception as e:
+        elapsed = time.time() - t0
+        logger.error("分析接口异常: %s elapsed=%.1fs", e, elapsed, exc_info=True)
+        raise
 
 
 @app.get("/api/v1/analysis/history", response_model=list[AnalysisHistoryItem])

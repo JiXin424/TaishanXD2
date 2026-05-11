@@ -535,6 +535,7 @@ def _run_user_phase(client, model, data_list):
             # 批次间隔，避免触发限流
             if batch_start + _BATCH_CONCURRENCY < total:
                 time.sleep(_BATCH_DELAY)
+    user_stats = []
     for uid in all_uids:
         g = groups[uid]
         user_stats.append({

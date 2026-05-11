@@ -229,16 +229,23 @@ export interface AnalysisResponse {
   success: boolean;
   data: AnalysisReport | null;
   error: string | null;
-  analysis_id: number | null;
+  analysis_id: string | null;
 }
 
 export interface AnalysisHistoryItem {
-  id: number;
+  id: string;
   app_id: string;
+  company_id: string;
   analysis_target: string;
   data_count: number;
+  coverage_display: string;
+  time_range: string;
   summary: string;
+  core_intents: string[];
+  quality_issues: string[];
   success: boolean;
+  error_msg?: string;
+  report: AnalysisReport | null;
   created_at: string;
 }
 
