@@ -521,6 +521,70 @@ body {
   background: var(--color-neutral-400);
 }
 
+/* ── User Detail Page ──────────────────────────────────── */
+
+@keyframes detailEnter {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-detail-enter {
+  animation: detailEnter 0.3s ease-out forwards;
+}
+
+/* Stagger children */
+.animate-stagger-1 { animation: slideUp 0.4s ease-out 0ms forwards; opacity: 0; }
+.animate-stagger-2 { animation: slideUp 0.4s ease-out 80ms forwards; opacity: 0; }
+.animate-stagger-3 { animation: slideUp 0.4s ease-out 160ms forwards; opacity: 0; }
+
+/* Back button hover */
+.detail-back-btn:hover .detail-back-arrow {
+  transform: translateX(-4px);
+}
+
+/* Session item */
+.detail-session-item {
+  border: none;
+  cursor: pointer;
+  outline: none;
+}
+
+/* Message bubble entrance */
+@keyframes msgSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.detail-msg-bubble {
+  animation: msgSlideIn 0.3s ease-out forwards;
+  opacity: 0;
+}
+
+/* Responsive: stack on mobile */
+@media (max-width: 768px) {
+  .animate-detail-enter {
+    flex-direction: column !important;
+    height: auto !important;
+  }
+  .animate-detail-enter > div:first-child {
+    width: 100% !important;
+    min-width: unset !important;
+    max-height: 300px;
+  }
+}
+
 /* ── Metric font ────────────────────────────────────────── */
 .metric-font {
   font-family: var(--font-family-display);
