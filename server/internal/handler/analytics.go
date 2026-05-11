@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -561,3 +562,146 @@ func orgUserStats(mongoUserID string, start, end time.Time) model.UserStatsRespo
 
 	return resp
 }
+
+func getUserSessions(c *gin.Context) {
+	userID := c.Query("user_id")
+	mode := c.Query("mode")
+	if userID == "" || mode == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id and mode are required"})
+		return
+	}
+
+	start, end, err := resolveTimeRange(
+		c.DefaultQuery("time_range", "yesterday"),
+		c.Query("start_date"),
+		c.Query("end_date"),
+	)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var sessions []model.UserSession
+
+	if mode == "kefu" {
+		sessions = kefuUserSessions(userID, start, end)
+	} else {
+		sessions = orgUserSessions(userID, start, end)
+	}
+
+	if sessions == nil {
+		sessions = []model.UserSession{}
+	}
+	c.JSON(http.StatusOK, sessions)
+}
+
+func parseKefuText(raw string) string {
+	var obj struct {
+		Text struct {
+			Content string `json:"content"`
+		} `json:"text"`
+	}
+	if err := json.Unmarshal([]byte(raw), &obj); err == nil && obj.Text.Content != "" {
+		return obj.Text.Content
+	}
+	var obj2 struct {
+		Text string `json:"text"`
+	}
+	if err := json.Unmarshal([]byte(raw), &obj2); err == nil && obj2.Text != "" {
+		return obj2.Text
+	}
+	return raw
+}
+
+func kefuUserSessions(externalUserID string, start, end time.Time) []model.UserSession {
+	rows, err := repository.DB.Query(`
+		SELECT id, content::text, created_at
+		FROM wecom_kefu_messages
+		WHERE external_userid = $1 AND direction = 'received' AND created_at >= $2 AND created_at < $3
+		ORDER BY created_at ASC
+	`, externalUserID, start, end)
+	if err != nil {
+		log.Printf("kefuUserSessions query error: %v", err)
+		return nil
+	}
+	defer rows.Close()
+
+	type msgRow struct {
+		ID        int
+		Content   string
+		CreatedAt time.Time
+	}
+	var msgs []msgRow
+	for rows.Next() {
+		var m msgRow
+		if err := rows.Scan(&m.ID, &m.Content, &m.CreatedAt); err != nil {
+			continue
+		}
+		msgs = append(msgs, m)
+	}
+	if len(msgs) == 0 {
+		return nil
+	}
+
+	var sessions []model.UserSession
+	groupStart := msgs[0].CreatedAt
+	groupLast := msgs[0].CreatedAt
+	groupFirstMsg := parseKefuText(msgs[0].Content)
+	groupCount := 1
+
+	for i := 1; i < len(msgs); i++ {
+		if msgs[i].CreatedAt.Sub(groupLast) > 30*time.Minute {
+			sessions = append(sessions, model.UserSession{
+				SessionID:    fmt.Sprintf("kefu-%d", msgs[i-1].ID),
+				FirstMessage: groupFirstMsg,
+				MessageCount: groupCount,
+				StartTime:    groupStart.Format(time.RFC3339),
+				LastTime:     groupLast.Format(time.RFC3339),
+			})
+			groupStart = msgs[i].CreatedAt
+			groupFirstMsg = parseKefuText(msgs[i].Content)
+			groupCount = 1
+		} else {
+			groupCount++
+		}
+		groupLast = msgs[i].CreatedAt
+	}
+	sessions = append(sessions, model.UserSession{
+		SessionID:    fmt.Sprintf("kefu-%d", msgs[len(msgs)-1].ID),
+		FirstMessage: groupFirstMsg,
+		MessageCount: groupCount,
+		StartTime:    groupStart.Format(time.RFC3339),
+		LastTime:     groupLast.Format(time.RFC3339),
+	})
+
+	return sessions
+}
+
+func orgUserSessions(mongoUserID string, start, end time.Time) []model.UserSession {
+	objID, err := bson.ObjectIDFromHex(mongoUserID)
+	if err != nil {
+		return nil
+	}
+
+	var user model.UserDoc
+	if err := repository.UsersColl().FindOne(
+		context.Background(),
+		bson.M{"_id": objID},
+	).Decode(&user); err != nil {
+		return nil
+	}
+
+	var kefuID string
+	for _, b := range user.ChannelBindings {
+		if b.Platform == "wecom_kefu" {
+			kefuID = b.PlatformUserID
+		}
+	}
+
+	if kefuID != "" {
+		return kefuUserSessions(kefuID, start, end)
+	}
+
+	return nil
+}
+
