@@ -123,3 +123,16 @@ type AnalyticsResponse struct {
 	ConversationVolume []TimeBucket `json:"conversationVolume"`
 	TimeDistribution   []HourBucket `json:"timeDistribution"`
 }
+
+type UserStatsResponse struct {
+	ConversationCount int `json:"conversationCount"`
+	TokenUsage        int `json:"tokenUsage"`
+}
+
+type UserSession struct {
+	SessionID    string `json:"sessionId"`
+	FirstMessage string `json:"firstMessage"`
+	MessageCount int    `json:"messageCount"`
+	StartTime    string `json:"startTime"`
+	LastTime     string `json:"lastTime"`
+}
