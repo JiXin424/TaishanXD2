@@ -254,3 +254,50 @@ export function fetchAnalysisHistory(appId: string, companyId: string, limit = 2
     `/api/analysis/history?app_id=${appId}&company_id=${companyId}&limit=${limit}`
   );
 }
+
+// --- User Detail ---
+
+export interface UserStats {
+  conversationCount: number;
+  tokenUsage: number;
+}
+
+export interface UserSession {
+  sessionId: string;
+  firstMessage: string;
+  messageCount: number;
+  startTime: string;
+  lastTime: string;
+}
+
+export interface UserStatsParams {
+  user_id: string;
+  mode: string;
+  time_range: string;
+  start_date?: string;
+  end_date?: string;
+}
+
+export async function fetchUserStats(params: UserStatsParams): Promise<UserStats> {
+  const qs = new URLSearchParams({
+    user_id: params.user_id,
+    mode: params.mode,
+    time_range: params.time_range,
+  });
+  if (params.start_date) qs.set("start_date", params.start_date);
+  if (params.end_date) qs.set("end_date", params.end_date);
+
+  return api<UserStats>(`/api/analytics/user-stats?${qs.toString()}`);
+}
+
+export async function fetchUserSessions(params: UserStatsParams): Promise<UserSession[]> {
+  const qs = new URLSearchParams({
+    user_id: params.user_id,
+    mode: params.mode,
+    time_range: params.time_range,
+  });
+  if (params.start_date) qs.set("start_date", params.start_date);
+  if (params.end_date) qs.set("end_date", params.end_date);
+
+  return api<UserSession[]>(`/api/analytics/user-sessions?${qs.toString()}`);
+}
