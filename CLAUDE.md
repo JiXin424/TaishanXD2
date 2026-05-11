@@ -56,7 +56,10 @@ TaishanXD2/
 │   │   │       ├── layout.tsx               # Dashboard 共享布局（侧边栏 + Header）
 │   │   │       ├── page.tsx                 # 重定向到 /dashboard/overview
 │   │   │       ├── overview/page.tsx        # 系统概览（健康检查、系统信息）
-│   │   │       ├── users/page.tsx           # 用户明细（表格 + 搜索 + 聊天记录 Drawer）
+│   │   │       ├── users/
+│   │   │       │   ├── page.tsx             # 用户明细（表格 + 搜索 + 导航到详情页）
+│   │   │       │   └── [id]/
+│   │   │       │       └── page.tsx         # 用户详情（双栏：统计+会话列表+聊天记录）
 │   │   │       └── analytics/page.tsx       # 使用分析（统计卡片 + 图表占位）
 │   │   ├── lib/api.ts               # HTTP 客户端封装 + TypeScript 类型定义
 │   │   ├── lib/AppContext.tsx        # 全局状态 Context（当前公司 ID + 渠道选择）
@@ -159,6 +162,8 @@ cd server && go run cmd/server/main.go  # http://localhost:4007
 | GET    | `/api/analytics/usage`                     | 否 | 使用分析聚合数据（按渠道/时间/聊天类型筛选，返回 4 组图表数据） |
 | POST   | `/api/analysis/analyze`                    | 否 | 触发 LLM 分析（Go 代理→查消息→转发 Python 服务→返回六段式报告） |
 | GET    | `/api/analysis/history`                    | 否 | 查询分析历史记录（参数：app_id, company_id, limit） |
+| GET    | `/api/analytics/user-stats`              | 否 | 单用户统计数据（会话数、Token消耗）|
+| GET    | `/api/analytics/user-sessions`            | 否 | 用户会话分组列表（按30分钟间隔分割）|
 
 ### 认证流程
 
